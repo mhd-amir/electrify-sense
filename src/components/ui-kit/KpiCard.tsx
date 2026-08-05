@@ -4,17 +4,8 @@ import type { ReactNode } from "react";
 
 import { AnimatedNumber } from "@/components/ui-kit/AnimatedNumber";
 import { Sparkline } from "@/components/ui-kit/Sparkline";
+import { toneText, type Tone } from "@/components/ui-kit/tone";
 import { cn } from "@/lib/utils";
-
-export type Tone = "info" | "ok" | "warn" | "hot" | "crit";
-
-const toneRing: Record<Tone, string> = {
-  info: "text-info",
-  ok: "text-ok",
-  warn: "text-warn",
-  hot: "text-hot",
-  crit: "text-crit",
-};
 
 export function KpiCard({
   label,
@@ -50,7 +41,7 @@ export function KpiCard({
       </div>
       <div className="flex items-start justify-between">
         <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">{label}</span>
-        <Icon className={cn("size-4", toneRing[tone])} />
+        <Icon className={cn("size-4", toneText[tone])} />
       </div>
       <div className="mt-3 flex items-end gap-1.5">
         <AnimatedNumber value={value} decimals={decimals} className="tabular text-2xl leading-none font-semibold" />
