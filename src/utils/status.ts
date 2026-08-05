@@ -1,11 +1,11 @@
 import type { AssetStatus, NodeKind, Priority, Severity } from "@/types/grid";
 
-export const statusMeta: Record<AssetStatus, { label: string; token: string; hex: string }> = {
-  normal: { label: "Normal", token: "ok", hex: "#22e39a" },
-  heavy: { label: "Heavy load", token: "warn", hex: "#ffd countdown" },
-  warning: { label: "Warning", token: "hot", hex: "#ff9f43" },
-  critical: { label: "Critical", token: "crit", hex: "#ff4d6d" },
-  failed: { label: "Failed", token: "crit", hex: "#ff2d55" },
+export const statusLabel: Record<AssetStatus, string> = {
+  normal: "Normal",
+  heavy: "Heavy load",
+  warning: "Warning",
+  critical: "Critical",
+  failed: "Failed",
 };
 
 export const statusColor: Record<AssetStatus, string> = {
