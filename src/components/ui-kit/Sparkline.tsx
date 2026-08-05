@@ -1,12 +1,4 @@
-import type { Tone } from "@/components/ui-kit/KpiCard";
-
-const toneVar: Record<Tone, string> = {
-  info: "var(--info)",
-  ok: "var(--ok)",
-  warn: "var(--warn)",
-  hot: "var(--hot)",
-  crit: "var(--crit)",
-};
+import { toneVar, type Tone } from "@/components/ui-kit/tone";
 
 export function Sparkline({ data, tone = "info" }: { data: number[]; tone?: Tone }) {
   const w = 120;
