@@ -453,7 +453,6 @@ export function restoreAll(state: GridState): GridState {
 
 export function applyRecommendation(state: GridState, rec: Recommendation): GridState {
   let nodes = state.nodes;
-  let demandBias = state.demandBias;
   switch (rec.action) {
     case "boost-hydro":
       nodes = nodes.map((n) => (n.kind === "hydro" ? { ...n, powerMw: clamp(n.powerMw + 60, 0, n.capacityMw) } : n));
@@ -474,7 +473,6 @@ export function applyRecommendation(state: GridState, rec: Recommendation): Grid
   return {
     ...state,
     nodes,
-    demandBias,
     recommendations: state.recommendations.map((r) => (r.id === rec.id ? { ...r, state: "accepted" } : r)),
     alerts: pushAlert(state.alerts, "info", `Action executed: ${rec.title}`, `${rec.impact} (operator accepted, confidence ${rec.confidence}%).`),
   };
