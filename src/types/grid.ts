@@ -62,7 +62,7 @@ export interface GridAlert {
   severity: Severity;
   title: string;
   detail: string;
-  assetId?: string;
+  assetId?: string | undefined;
   acknowledged: boolean;
 }
 
