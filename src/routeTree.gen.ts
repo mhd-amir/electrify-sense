@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
+import { Route as PowerPlantsRouteImport } from './routes/power-plants'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const DigitalTwinRoute = DigitalTwinRouteImport.update({
   path: '/digital-twin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PowerPlantsRoute = PowerPlantsRouteImport.update({
+  id: '/power-plants',
+  path: '/power-plants',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
+  '/power-plants': typeof PowerPlantsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
+  '/power-plants': typeof PowerPlantsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
+  '/power-plants': typeof PowerPlantsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analytics' | '/digital-twin'
+  fullPaths: '/' | '/analytics' | '/digital-twin' | '/power-plants'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/digital-twin'
-  id: '__root__' | '/' | '/analytics' | '/digital-twin'
+  to: '/' | '/analytics' | '/digital-twin' | '/power-plants'
+  id: '__root__' | '/' | '/analytics' | '/digital-twin' | '/power-plants'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
+  PowerPlantsRoute: typeof PowerPlantsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DigitalTwinRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/power-plants': {
+      id: '/power-plants'
+      path: '/power-plants'
+      fullPath: '/power-plants'
+      preLoaderRoute: typeof PowerPlantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   DigitalTwinRoute: DigitalTwinRoute,
+  PowerPlantsRoute: PowerPlantsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
