@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DigitalTwinRoute = DigitalTwinRouteImport.update({
+  id: '/digital-twin',
+  path: '/digital-twin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/digital-twin': typeof DigitalTwinRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/digital-twin': typeof DigitalTwinRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/digital-twin': typeof DigitalTwinRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/digital-twin'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/digital-twin'
+  id: '__root__' | '/' | '/digital-twin'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DigitalTwinRoute: typeof DigitalTwinRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/digital-twin': {
+      id: '/digital-twin'
+      path: '/digital-twin'
+      fullPath: '/digital-twin'
+      preLoaderRoute: typeof DigitalTwinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DigitalTwinRoute: DigitalTwinRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
