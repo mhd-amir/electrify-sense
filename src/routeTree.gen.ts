@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 import { Route as PowerPlantsRouteImport } from './routes/power-plants'
+import { Route as SubstationsRouteImport } from './routes/substations'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const PowerPlantsRoute = PowerPlantsRouteImport.update({
   path: '/power-plants',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubstationsRoute = SubstationsRouteImport.update({
+  id: '/substations',
+  path: '/substations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/power-plants': typeof PowerPlantsRoute
+  '/substations': typeof SubstationsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/power-plants': typeof PowerPlantsRoute
+  '/substations': typeof SubstationsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,21 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/power-plants': typeof PowerPlantsRoute
+  '/substations': typeof SubstationsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/analytics' | '/digital-twin' | '/power-plants'
+  fullPaths:
+    '/' | '/analytics' | '/digital-twin' | '/power-plants' | '/substations'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/analytics' | '/digital-twin' | '/power-plants'
-  id: '__root__' | '/' | '/analytics' | '/digital-twin' | '/power-plants'
+  to: '/' | '/analytics' | '/digital-twin' | '/power-plants' | '/substations'
+  id:
+    | '__root__'
+    | '/'
+    | '/analytics'
+    | '/digital-twin'
+    | '/power-plants'
+    | '/substations'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +83,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
   PowerPlantsRoute: typeof PowerPlantsRoute
+  SubstationsRoute: typeof SubstationsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PowerPlantsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/substations': {
+      id: '/substations'
+      path: '/substations'
+      fullPath: '/substations'
+      preLoaderRoute: typeof SubstationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +131,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   DigitalTwinRoute: DigitalTwinRoute,
   PowerPlantsRoute: PowerPlantsRoute,
+  SubstationsRoute: SubstationsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
