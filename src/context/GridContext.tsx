@@ -129,10 +129,17 @@ export function GridProvider({ children }: { children: ReactNode }) {
       restore: () => setState((s) => restoreAll(s)),
       acceptRec: (rec) => setState((s) => applyRecommendation(s, rec)),
       dismissRec: (id) =>
-        setState((s) => ({
-          ...s,
-          recommendations: s.recommendations.map((r) => (r.id === id ? { ...r, state: "dismissed" } : r)),
-        })),
+        setState((s) => {
+          const rec = s.recommendations.find((r) => r.id === id);
+          const next: GridState = {
+            ...s,
+            recommendations: s.recommendations.map((r) => (r.id === id ? { ...r, state: "dismissed" } : r)),
+            metrics: { ...s.metrics, stability: clamp(s.metrics.stability - 1.5, 0, 100), aiConfidence: clamp(s.metrics.aiConfidence - 1, 60, 99) },
+          };
+          return rec
+            ? systemAlert(next, "warning", `Action dismissed: ${rec.title}`, `Operator declined the ${rec.priority} priority action; risk remains — ${rec.reason}`)
+            : next;
+        }),
       ackAlert: (id) =>
         setState((s) => ({ ...s, alerts: s.alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)) })),
       clearAlerts: () => setState((s) => ({ ...s, alerts: [] })),

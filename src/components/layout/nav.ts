@@ -4,6 +4,7 @@ import {
   BarChart3,
   BatteryCharging,
   Boxes,
+  Radio,
   Building2,
   Cpu,
   Factory,
@@ -25,6 +26,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, group: "Operations" },
   { to: "/digital-twin", label: "Digital Twin", icon: Boxes, group: "Operations" },
+  { to: "/telemetry", label: "Live Telemetry", icon: Radio, group: "Operations" },
   { to: "/power-plants", label: "Power Plants", icon: Factory, group: "Assets" },
   { to: "/substations", label: "Substations", icon: Building2, group: "Assets" },
   { to: "/transmission-lines", label: "Transmission Lines", icon: Zap, group: "Assets" },
