@@ -10,7 +10,7 @@ import type {
   Scenario,
   Severity,
 } from "@/types/grid";
-import { clamp, jitter } from "@/utils/format";
+import { clamp, jitter, rand, resetRand } from "@/utils/format";
 import { lineStatus } from "@/utils/status";
 
 let seq = 0;
@@ -41,14 +41,18 @@ function loadShape(hour: number) {
   return 0.68 + 0.2 * morning + 0.3 * evening;
 }
 
+/** Fixed simulated start-of-day so SSR and client hydration agree (06:00 sim time). */
+export const SIM_EPOCH = Date.UTC(2026, 0, 12, 5, 0);
+
 export function createInitialState(): GridState {
+  resetRand();
   const nodes = createNodes();
   const lines = createLines();
   const state: GridState = {
     running: true,
     speed: 1,
     tick: 0,
-    clock: Date.now(),
+    clock: SIM_EPOCH,
     scenario: "normal",
     demandBias: 0,
     nodes,
@@ -172,7 +176,7 @@ function addRec(list: Recommendation[], rec: Recommendation) {
 export function step(state: GridState, warmup = false): GridState {
   const clock = state.clock + 1000 * (warmup ? 60 : 1);
   const date = new Date(clock);
-  const hour = date.getHours() + date.getMinutes() / 60;
+  const hour = date.getUTCHours() + date.getUTCMinutes() / 60;
   const weather = weatherFor(state.scenario, hour);
   const heat = state.scenario === "heatwave";
   const storm = state.scenario === "storm";
@@ -310,7 +314,7 @@ export function step(state: GridState, warmup = false): GridState {
     );
     const rerouteBoost = neighbourFailed ? 1.28 : 1;
     const base = 0.58 + (systemRatio - 1) * 0.6 + state.demandBias * 0.5 + (heat ? 0.06 : 0) + (storm ? 0.04 : 0);
-    const target = l.capacityMw * clamp(base * rerouteBoost, 0.15, 1.18) * (0.95 + Math.random() * 0.1);
+    const target = l.capacityMw * clamp(base * rerouteBoost, 0.15, 1.18) * (0.95 + rand() * 0.1);
     l.flowMw = clamp(l.flowMw + (target - l.flowMw) * 0.3, 0, l.capacityMw * 1.25);
     l.loadPct = Math.round((l.flowMw / l.capacityMw) * 100);
     l.lossMw = Number(((l.flowMw * l.lengthKm) / 100000).toFixed(1));
@@ -371,7 +375,7 @@ export function step(state: GridState, warmup = false): GridState {
   if (batterySocPct < 22) {
     alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — storage reserve nearly depleted.`);
   }
-  if (storm && Math.random() < 0.08) {
+  if (storm && rand() < 0.08) {
     alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.");
   }
   if (demandMw > generationMw * 1.02) {

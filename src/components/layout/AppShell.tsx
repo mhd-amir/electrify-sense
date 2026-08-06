@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 
+import { AssetDrawer } from "@/components/assets/AssetDrawer";
 import { AlertsDrawer } from "@/components/layout/AlertsDrawer";
 import { SimControls } from "@/components/layout/SimControls";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -18,6 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <SimControls />
       </div>
       <AlertsDrawer open={alertsOpen} onClose={() => setAlertsOpen(false)} />
+      <AssetDrawer />
     </div>
   );
 }

@@ -10,33 +10,115 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AiPredictionsRouteImport } from './routes/ai-predictions'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
+import { Route as PowerPlantsRouteImport } from './routes/power-plants'
+import { Route as SubstationsRouteImport } from './routes/substations'
+import { Route as TelemetryRouteImport } from './routes/telemetry'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiPredictionsRoute = AiPredictionsRouteImport.update({
+  id: '/ai-predictions',
+  path: '/ai-predictions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DigitalTwinRoute = DigitalTwinRouteImport.update({
+  id: '/digital-twin',
+  path: '/digital-twin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PowerPlantsRoute = PowerPlantsRouteImport.update({
+  id: '/power-plants',
+  path: '/power-plants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubstationsRoute = SubstationsRouteImport.update({
+  id: '/substations',
+  path: '/substations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TelemetryRoute = TelemetryRouteImport.update({
+  id: '/telemetry',
+  path: '/telemetry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-predictions': typeof AiPredictionsRoute
+  '/analytics': typeof AnalyticsRoute
+  '/digital-twin': typeof DigitalTwinRoute
+  '/power-plants': typeof PowerPlantsRoute
+  '/substations': typeof SubstationsRoute
+  '/telemetry': typeof TelemetryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-predictions': typeof AiPredictionsRoute
+  '/analytics': typeof AnalyticsRoute
+  '/digital-twin': typeof DigitalTwinRoute
+  '/power-plants': typeof PowerPlantsRoute
+  '/substations': typeof SubstationsRoute
+  '/telemetry': typeof TelemetryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-predictions': typeof AiPredictionsRoute
+  '/analytics': typeof AnalyticsRoute
+  '/digital-twin': typeof DigitalTwinRoute
+  '/power-plants': typeof PowerPlantsRoute
+  '/substations': typeof SubstationsRoute
+  '/telemetry': typeof TelemetryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/ai-predictions'
+    | '/analytics'
+    | '/digital-twin'
+    | '/power-plants'
+    | '/substations'
+    | '/telemetry'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/ai-predictions'
+    | '/analytics'
+    | '/digital-twin'
+    | '/power-plants'
+    | '/substations'
+    | '/telemetry'
+  id:
+    | '__root__'
+    | '/'
+    | '/ai-predictions'
+    | '/analytics'
+    | '/digital-twin'
+    | '/power-plants'
+    | '/substations'
+    | '/telemetry'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiPredictionsRoute: typeof AiPredictionsRoute
+  AnalyticsRoute: typeof AnalyticsRoute
+  DigitalTwinRoute: typeof DigitalTwinRoute
+  PowerPlantsRoute: typeof PowerPlantsRoute
+  SubstationsRoute: typeof SubstationsRoute
+  TelemetryRoute: typeof TelemetryRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +130,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-predictions': {
+      id: '/ai-predictions'
+      path: '/ai-predictions'
+      fullPath: '/ai-predictions'
+      preLoaderRoute: typeof AiPredictionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/digital-twin': {
+      id: '/digital-twin'
+      path: '/digital-twin'
+      fullPath: '/digital-twin'
+      preLoaderRoute: typeof DigitalTwinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/power-plants': {
+      id: '/power-plants'
+      path: '/power-plants'
+      fullPath: '/power-plants'
+      preLoaderRoute: typeof PowerPlantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/substations': {
+      id: '/substations'
+      path: '/substations'
+      fullPath: '/substations'
+      preLoaderRoute: typeof SubstationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/telemetry': {
+      id: '/telemetry'
+      path: '/telemetry'
+      fullPath: '/telemetry'
+      preLoaderRoute: typeof TelemetryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiPredictionsRoute: AiPredictionsRoute,
+  AnalyticsRoute: AnalyticsRoute,
+  DigitalTwinRoute: DigitalTwinRoute,
+  PowerPlantsRoute: PowerPlantsRoute,
+  SubstationsRoute: SubstationsRoute,
+  TelemetryRoute: TelemetryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
