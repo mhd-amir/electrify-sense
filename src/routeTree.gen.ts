@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AiPredictionsRouteImport } from './routes/ai-predictions'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 import { Route as PowerPlantsRouteImport } from './routes/power-plants'
@@ -19,6 +20,11 @@ import { Route as TelemetryRouteImport } from './routes/telemetry'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiPredictionsRoute = AiPredictionsRouteImport.update({
+  id: '/ai-predictions',
+  path: '/ai-predictions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnalyticsRoute = AnalyticsRouteImport.update({
@@ -49,6 +55,7 @@ const TelemetryRoute = TelemetryRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-predictions': typeof AiPredictionsRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/power-plants': typeof PowerPlantsRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-predictions': typeof AiPredictionsRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/power-plants': typeof PowerPlantsRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-predictions': typeof AiPredictionsRoute
   '/analytics': typeof AnalyticsRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/power-plants': typeof PowerPlantsRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai-predictions'
     | '/analytics'
     | '/digital-twin'
     | '/power-plants'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai-predictions'
     | '/analytics'
     | '/digital-twin'
     | '/power-plants'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai-predictions'
     | '/analytics'
     | '/digital-twin'
     | '/power-plants'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiPredictionsRoute: typeof AiPredictionsRoute
   AnalyticsRoute: typeof AnalyticsRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
   PowerPlantsRoute: typeof PowerPlantsRoute
@@ -115,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai-predictions': {
+      id: '/ai-predictions'
+      path: '/ai-predictions'
+      fullPath: '/ai-predictions'
+      preLoaderRoute: typeof AiPredictionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics': {
@@ -157,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiPredictionsRoute: AiPredictionsRoute,
   AnalyticsRoute: AnalyticsRoute,
   DigitalTwinRoute: DigitalTwinRoute,
   PowerPlantsRoute: PowerPlantsRoute,
