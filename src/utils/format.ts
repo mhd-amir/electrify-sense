@@ -10,10 +10,10 @@ export const degc = (v: number) => `${nf(v, 1)} °C`;
 export const hz = (v: number) => `${nf(v, 3)} Hz`;
 
 export const clockLabel = (ms: number) =>
-  new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" });
 
 export const dateLabel = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+  new Date(ms).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: "UTC" });
 
 export const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 

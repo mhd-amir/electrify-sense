@@ -42,7 +42,7 @@ function loadShape(hour: number) {
 }
 
 /** Fixed simulated start-of-day so SSR and client hydration agree (06:00 sim time). */
-export const SIM_EPOCH = Date.UTC(2026, 0, 12, 0, 30);
+export const SIM_EPOCH = Date.UTC(2026, 0, 12, 5, 0);
 
 export function createInitialState(): GridState {
   resetRand();
@@ -176,7 +176,7 @@ function addRec(list: Recommendation[], rec: Recommendation) {
 export function step(state: GridState, warmup = false): GridState {
   const clock = state.clock + 1000 * (warmup ? 60 : 1);
   const date = new Date(clock);
-  const hour = date.getHours() + date.getMinutes() / 60;
+  const hour = date.getUTCHours() + date.getUTCMinutes() / 60;
   const weather = weatherFor(state.scenario, hour);
   const heat = state.scenario === "heatwave";
   const storm = state.scenario === "storm";
