@@ -1,3 +1,4 @@
+import { rand } from "@/utils/format";
 import type { GridLine, GridNode, NodeKind, Region } from "@/types/grid";
 
 interface Seed {
@@ -119,7 +120,7 @@ export function createNodes(): GridNode[] {
       voltageKv: s.kv,
       currentA: Math.round((powerMw * 1e3) / (Math.sqrt(3) * s.kv)),
       tempC: s.kind === "coal" ? 68 : s.kind === "nuclear" ? 74 : 42,
-      health: 92 + Math.round(Math.random() * 7),
+      health: 92 + Math.round(rand() * 7),
       efficiency:
         s.kind === "coal" ? 38 : s.kind === "nuclear" ? 34 : s.kind === "hydro" ? 91 : s.kind === "solar" ? 21 : s.kind === "wind" ? 46 : 94,
       status: "normal",
@@ -133,7 +134,7 @@ export function createNodes(): GridNode[] {
 
 export function createLines(): GridLine[] {
   return lineSeeds.map((l, i) => {
-    const flowMw = Math.round(l.capacityMw * (0.5 + Math.random() * 0.25));
+    const flowMw = Math.round(l.capacityMw * (0.5 + rand() * 0.25));
     return {
       id: `line-${String(i + 1).padStart(2, "0")}`,
       name: `L-${String(i + 1).padStart(2, "0")} ${l.kv} kV`,
