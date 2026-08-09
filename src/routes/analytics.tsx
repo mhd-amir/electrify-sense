@@ -81,9 +81,17 @@ function AnalyticsPage() {
           icon={<BarChart3 className="size-4" />}
           subtitle={`Rolling window of the last ${data.length} simulated samples`}
           right={
-            <span className="tabular text-[11px] text-muted-foreground">
-              Peak demand {nf(Math.max(...data.map((d) => d.demandMw)))} MW
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="tabular hidden text-[11px] text-muted-foreground sm:inline">
+                Peak demand {nf(Math.max(...data.map((d) => d.demandMw)))} MW
+              </span>
+              <Button size="sm" variant="outline" className="h-8 gap-1 text-[11px]" onClick={() => exportHistoryCsv(state)}>
+                <Download className="size-3" /> CSV
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 gap-1 text-[11px]" onClick={() => void exportHistoryPdf(state)}>
+                <FileText className="size-3" /> PDF
+              </Button>
+            </div>
           }
         />
       </Panel>
