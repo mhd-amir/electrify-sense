@@ -111,8 +111,8 @@ export interface GridAlert {
   assetId?: string | undefined;
   acknowledged: boolean;
   /** stable key used for de-duplication and auto-resolution */
-  key?: string;
-  resolved?: boolean;
+  key?: string | undefined;
+  resolved?: boolean | undefined;
 }
 
 export type Priority = "low" | "medium" | "high" | "critical";
