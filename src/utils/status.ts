@@ -1,4 +1,4 @@
-import type { AssetStatus, NodeKind, Priority, Severity } from "@/types/grid";
+import type { AssetStatus, MaintenanceCondition, NodeKind, Priority, Severity } from "@/types/grid";
 
 export const statusLabel: Record<AssetStatus, string> = {
   normal: "Normal",
@@ -37,13 +37,33 @@ export const priorityClasses: Record<Priority, string> = {
   critical: "text-crit border-crit/50 bg-crit/10",
 };
 
-export function lineStatus(loadPct: number, failed: boolean): AssetStatus {
+export function lineStatus(
+  loadPct: number,
+  failed: boolean,
+  th?: { lineWarnPct: number; lineCritPct: number },
+): AssetStatus {
   if (failed) return "failed";
-  if (loadPct >= 100) return "critical";
-  if (loadPct >= 88) return "warning";
-  if (loadPct >= 72) return "heavy";
+  const crit = th?.lineCritPct ?? 100;
+  const warn = th?.lineWarnPct ?? 88;
+  if (loadPct >= crit) return "critical";
+  if (loadPct >= warn) return "warning";
+  if (loadPct >= warn * 0.82) return "heavy";
   return "normal";
 }
+
+export const conditionLabel: Record<MaintenanceCondition, string> = {
+  good: "Good",
+  fair: "Fair",
+  attention: "Needs attention",
+  overdue: "Service overdue",
+};
+
+export const conditionClasses: Record<MaintenanceCondition, string> = {
+  good: "text-ok border-ok/40 bg-ok/10",
+  fair: "text-info border-info/40 bg-info/10",
+  attention: "text-warn border-warn/40 bg-warn/10",
+  overdue: "text-crit border-crit/50 bg-crit/10",
+};
 
 export const kindLabel: Record<NodeKind, string> = {
   coal: "Thermal (Coal)",

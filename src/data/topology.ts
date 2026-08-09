@@ -1,5 +1,6 @@
 import { rand } from "@/utils/format";
 import type { GridLine, GridNode, NodeKind, Region } from "@/types/grid";
+import { createMaintenance } from "@/data/maintenance";
 
 interface Seed {
   id: string;
@@ -108,6 +109,7 @@ export function createNodes(): GridNode[] {
   return seeds.map((s) => {
     const factor = baseLoadFactor[s.kind] ?? 0.6;
     const powerMw = Math.round(s.capacityMw * factor);
+    const health = 92 + Math.round(rand() * 7);
     return {
       id: s.id,
       name: s.name,
@@ -120,7 +122,8 @@ export function createNodes(): GridNode[] {
       voltageKv: s.kv,
       currentA: Math.round((powerMw * 1e3) / (Math.sqrt(3) * s.kv)),
       tempC: s.kind === "coal" ? 68 : s.kind === "nuclear" ? 74 : 42,
-      health: 92 + Math.round(rand() * 7),
+      health,
+      maintenance: createMaintenance(s.id, s.kind, health),
       efficiency:
         s.kind === "coal" ? 38 : s.kind === "nuclear" ? 34 : s.kind === "hydro" ? 91 : s.kind === "solar" ? 21 : s.kind === "wind" ? 46 : 94,
       status: "normal",

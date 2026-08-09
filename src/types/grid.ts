@@ -14,6 +14,51 @@ export type NodeKind =
 
 export type Region = "North" | "South" | "East" | "West" | "Central";
 
+export type ServiceKind = "preventive" | "corrective" | "inspection" | "upgrade";
+
+export interface ServiceRecord {
+  id: string;
+  ts: number;
+  kind: ServiceKind;
+  summary: string;
+  technician: string;
+  downtimeH: number;
+  costLakh: number;
+}
+
+export type MaintenanceCondition = "good" | "fair" | "attention" | "overdue";
+
+export interface Maintenance {
+  lastServiceTs: number;
+  nextServiceTs: number;
+  intervalDays: number;
+  runtimeHours: number;
+  startsCount: number;
+  faults12m: number;
+  mtbfDays: number;
+  vibrationMm: number;
+  oilQualityPct: number;
+  insulationMohm: number;
+  wearPct: number;
+  condition: MaintenanceCondition;
+  history: ServiceRecord[];
+}
+
+export interface Thresholds {
+  freqWarnHz: number;
+  freqCritHz: number;
+  voltageMinKv: number;
+  voltageMaxKv: number;
+  tempWarnC: number;
+  tempCritC: number;
+  stabilityWarn: number;
+  stabilityCrit: number;
+  lineWarnPct: number;
+  lineCritPct: number;
+  batterySocMinPct: number;
+  autoResolve: boolean;
+}
+
 export interface GridNode {
   id: string;
   name: string;
@@ -37,6 +82,7 @@ export interface GridNode {
   bays?: number;
   baysActive?: number;
   connectors?: string[];
+  maintenance: Maintenance;
 }
 
 export interface GridLine {
@@ -64,6 +110,9 @@ export interface GridAlert {
   detail: string;
   assetId?: string | undefined;
   acknowledged: boolean;
+  /** stable key used for de-duplication and auto-resolution */
+  key?: string | undefined;
+  resolved?: boolean | undefined;
 }
 
 export type Priority = "low" | "medium" | "high" | "critical";
@@ -133,6 +182,7 @@ export interface GridState {
   metrics: Metrics;
   history: Sample[];
   alerts: GridAlert[];
+  thresholds: Thresholds;
   recommendations: Recommendation[];
   weather: Weather;
   demoStep: number;

@@ -17,6 +17,16 @@ export const dateLabel = (ms: number) =>
 
 export const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+/** Fixed simulated start-of-day so SSR and client hydration agree (06:00 sim time). */
+export const SIM_EPOCH = Date.UTC(2026, 0, 12, 5, 0);
+
+export const DAY_MS = 86_400_000;
+
+export const dateTimeLabel = (ms: number) =>
+  `${new Date(ms).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })}`;
+
+export const daysBetween = (a: number, b: number) => Math.round((b - a) / DAY_MS);
+
 /**
  * Deterministic pseudo-random source (mulberry32). Used instead of Math.random so
  * the SSR-rendered telemetry matches the first client render exactly.
