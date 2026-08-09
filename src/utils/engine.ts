@@ -1,4 +1,5 @@
 import { INITIAL_WEATHER, RENEWABLE_KINDS, SINK_KINDS, SOURCE_KINDS, createLines, createNodes } from "@/data/topology";
+import { conditionFor } from "@/data/maintenance";
 import type {
   GridAlert,
   GridLine,
@@ -9,9 +10,27 @@ import type {
   RecommendationAction,
   Scenario,
   Severity,
+  Thresholds,
 } from "@/types/grid";
-import { clamp, jitter, rand, resetRand } from "@/utils/format";
+import { DAY_MS, SIM_EPOCH, clamp, jitter, rand, resetRand } from "@/utils/format";
 import { lineStatus } from "@/utils/status";
+
+export { SIM_EPOCH };
+
+export const DEFAULT_THRESHOLDS: Thresholds = {
+  freqWarnHz: 0.15,
+  freqCritHz: 0.3,
+  voltageMinKv: 372,
+  voltageMaxKv: 415,
+  tempWarnC: 84,
+  tempCritC: 92,
+  stabilityWarn: 78,
+  stabilityCrit: 60,
+  lineWarnPct: 88,
+  lineCritPct: 100,
+  batterySocMinPct: 22,
+  autoResolve: true,
+};
 
 let seq = 0;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
@@ -40,9 +59,6 @@ function loadShape(hour: number) {
   const evening = Math.exp(-((hour - 20) ** 2) / 6);
   return 0.68 + 0.2 * morning + 0.3 * evening;
 }
-
-/** Fixed simulated start-of-day so SSR and client hydration agree (06:00 sim time). */
-export const SIM_EPOCH = Date.UTC(2026, 0, 12, 5, 0);
 
 export function createInitialState(): GridState {
   resetRand();
@@ -74,6 +90,7 @@ export function createInitialState(): GridState {
     },
     history: [],
     alerts: [],
+    thresholds: { ...DEFAULT_THRESHOLDS },
     recommendations: [],
     weather: { ...INITIAL_WEATHER },
     demoStep: -1,
