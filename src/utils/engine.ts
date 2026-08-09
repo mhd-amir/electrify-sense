@@ -582,15 +582,6 @@ export function serviceAsset(state: GridState, id: string): GridState {
   };
 }
 
-function _restoreAllLegacy(state: GridState): GridState {
-  return {
-    ...state,
-    nodes: state.nodes.map((n) => (n.status === "failed" ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
-    lines: state.lines.map((l) => (l.status === "failed" ? { ...l, status: "normal" } : l)),
-    alerts: pushAlert(state.alerts, "info", "Assets restored to service", "All tripped assets have been re-energised and are synchronising."),
-  };
-}
-
 export function applyRecommendation(state: GridState, rec: Recommendation): GridState {
   let nodes = state.nodes;
   switch (rec.action) {
