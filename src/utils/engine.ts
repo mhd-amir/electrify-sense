@@ -539,13 +539,13 @@ export function restoreAll(state: GridState): GridState {
 export function serviceAsset(state: GridState, id: string): GridState {
   const node = state.nodes.find((n) => n.id === id);
   if (!node) return state;
-  const nodes = state.nodes.map((n) => {
+  const nodes: GridNode[] = state.nodes.map((n) => {
     if (n.id !== id) return n;
     const m = n.maintenance;
     return {
       ...n,
       health: clamp(n.health + 6, 0, 100),
-      status: n.status === "failed" ? n.status : "normal",
+      status: n.status === "failed" ? n.status : ("normal" as const),
       maintenance: {
         ...m,
         lastServiceTs: state.clock,
