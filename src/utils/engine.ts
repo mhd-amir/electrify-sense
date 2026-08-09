@@ -209,6 +209,7 @@ export function step(state: GridState, warmup = false): GridState {
 
   let alerts = state.alerts;
   let recommendations = state.recommendations;
+  const th = state.thresholds ?? DEFAULT_THRESHOLDS;
 
   // ---------- loads ----------
   const shape = loadShape(hour);
@@ -346,12 +347,16 @@ export function step(state: GridState, warmup = false): GridState {
     l.lossMw = Number(((l.flowMw * l.lengthKm) / 100000).toFixed(1));
     l.tempC = clamp(38 + l.loadPct * 0.35 + (heat ? 8 : 0) + jitter(1), 30, 132);
     const prev = l.status;
-    l.status = lineStatus(l.loadPct, false);
+    l.status = lineStatus(l.loadPct, false, th);
     if (l.status === "critical" && prev !== "critical") {
-      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating.`, l.id);
+      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating (limit ${th.lineCritPct}%).`, l.id, `line-crit:${l.id}`);
       recommendations = addRec(recommendations, makeRecommendation("shift-north", `${l.name} exceeded its thermal limit at ${l.loadPct}% loading.`));
     } else if (l.status === "warning" && prev === "normal") {
-      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id);
+      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id, `line-warn:${l.id}`);
+    }
+    if (l.status === "normal" || l.status === "heavy") {
+      alerts = resolveAlert(alerts, `line-crit:${l.id}`, th.autoResolve);
+      alerts = resolveAlert(alerts, `line-warn:${l.id}`, th.autoResolve);
     }
   }
 
@@ -365,12 +370,44 @@ export function step(state: GridState, warmup = false): GridState {
     n.tempC = clamp(n.tempC + jitter(0.5) + (heat ? 0.3 : -0.1) + (n.powerMw / n.capacityMw > 0.9 ? 0.4 : -0.1), 30, 118);
     if (n.status !== "failed") {
       const util = n.powerMw / n.capacityMw;
-      n.status = n.tempC > 92 ? "critical" : util > 1 ? "critical" : util > 0.9 ? "warning" : util > 0.78 ? "heavy" : "normal";
-      n.health = clamp(n.health + (n.tempC > 88 ? -0.06 : 0.02), 50, 100);
-      if (n.tempC > 92) {
-        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the 92 °C alarm limit.`, n.id);
+      n.status = n.tempC > th.tempCritC ? "critical" : util > 1 ? "critical" : n.tempC > th.tempWarnC ? "warning" : util > 0.9 ? "warning" : util > 0.78 ? "heavy" : "normal";
+      n.health = clamp(n.health + (n.tempC > th.tempWarnC ? -0.06 : 0.02), 50, 100);
+      if (n.tempC > th.tempCritC) {
+        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the ${th.tempCritC} °C alarm limit.`, n.id, `temp:${n.id}`);
         recommendations = addRec(recommendations, makeRecommendation("schedule-maintenance", `${n.name} transformer running hot for multiple intervals.`));
+      } else if (n.tempC < th.tempWarnC) {
+        alerts = resolveAlert(alerts, `temp:${n.id}`, th.autoResolve);
       }
+    }
+  }
+
+  // ---------- condition monitoring / maintenance wear ----------
+  for (const n of nodes) {
+    const m = n.maintenance;
+    const util = clamp(n.powerMw / Math.max(1, n.capacityMw), 0, 1.3);
+    const hours = (warmup ? 60 : 1) / 3600;
+    const sinceDays = Math.max(0, (clock - m.lastServiceTs) / DAY_MS);
+    const wearPct = clamp((sinceDays / m.intervalDays) * 100 * (1 + m.faults12m * 0.06) + (n.tempC > th.tempWarnC ? 0.4 : 0), 0, 160);
+    n.maintenance = {
+      ...m,
+      runtimeHours: Number((m.runtimeHours + hours * (n.status === "failed" ? 0 : 1)).toFixed(2)),
+      vibrationMm: Number(clamp(m.vibrationMm + jitter(0.02) + util * 0.002, 0.4, 9).toFixed(2)),
+      oilQualityPct: Number(clamp(m.oilQualityPct - (n.tempC > th.tempWarnC ? 0.01 : 0.001), 40, 100).toFixed(2)),
+      insulationMohm: Math.round(clamp(m.insulationMohm + jitter(1.2) - (n.tempC > th.tempCritC ? 0.6 : 0), 60, 1200)),
+      wearPct: Number(wearPct.toFixed(1)),
+      condition: conditionFor(wearPct, n.health),
+    };
+    if (n.maintenance.condition === "overdue") {
+      alerts = pushAlert(
+        alerts,
+        "warning",
+        `Maintenance overdue — ${n.name}`,
+        `Service window exceeded (${wearPct.toFixed(0)}% of interval, health ${n.health.toFixed(0)}%). Condition monitoring recommends intervention.`,
+        n.id,
+        `maint:${n.id}`,
+      );
+    } else {
+      alerts = resolveAlert(alerts, `maint:${n.id}`, th.autoResolve);
     }
   }
 
@@ -391,15 +428,32 @@ export function step(state: GridState, warmup = false): GridState {
   const healthScore = clamp(stability * 0.55 + avgHealth * 0.45 - failedAssets * 2, 15, 99);
   const aiConfidence = clamp(96 - failedAssets * 3.2 - (storm ? 5 : 0) - Math.abs(50 - frequencyHz) * 8 + jitter(0.6), 55, 99);
 
-  if (frequencyHz < 49.85) {
-    alerts = pushAlert(alerts, "critical", "System frequency below 49.85 Hz", `Frequency ${frequencyHz.toFixed(3)} Hz — generation deficit of ${Math.round(Math.max(0, demandMw - generationMw))} MW.`);
+  // ---------- threshold-driven alerting ----------
+  const freqDev = Math.abs(50 - frequencyHz);
+  if (freqDev > th.freqCritHz) {
+    alerts = pushAlert(alerts, "critical", `System frequency outside ${th.freqCritHz.toFixed(2)} Hz band`, `Frequency ${frequencyHz.toFixed(3)} Hz — imbalance of ${Math.round(Math.abs(demandMw - generationMw))} MW.`, undefined, "freq");
     recommendations = addRec(recommendations, makeRecommendation("boost-hydro", `Frequency at ${frequencyHz.toFixed(2)} Hz with falling reserve margin.`));
+  } else if (freqDev > th.freqWarnHz) {
+    alerts = pushAlert(alerts, "warning", `Frequency deviation ${freqDev.toFixed(2)} Hz`, `Frequency ${frequencyHz.toFixed(3)} Hz drifting beyond the ${th.freqWarnHz.toFixed(2)} Hz warning band.`, undefined, "freq");
+  } else {
+    alerts = resolveAlert(alerts, "freq", th.autoResolve);
   }
-  if (gridVoltage < 372) {
-    alerts = pushAlert(alerts, "warning", "Voltage drop detected on 400 kV bus", `Bus voltage ${gridVoltage.toFixed(1)} kV, below the 372 kV operating band.`);
+  if (gridVoltage < th.voltageMinKv || gridVoltage > th.voltageMaxKv) {
+    alerts = pushAlert(alerts, "warning", "Bus voltage outside operating band", `Bus voltage ${gridVoltage.toFixed(1)} kV against the ${th.voltageMinKv}–${th.voltageMaxKv} kV band.`, undefined, "voltage");
+  } else {
+    alerts = resolveAlert(alerts, "voltage", th.autoResolve);
   }
-  if (batterySocPct < 22) {
-    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — storage reserve nearly depleted.`);
+  if (stability < th.stabilityCrit) {
+    alerts = pushAlert(alerts, "critical", "Grid stability index critical", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityCrit}% emergency threshold.`, undefined, "stability");
+  } else if (stability < th.stabilityWarn) {
+    alerts = pushAlert(alerts, "warning", "Grid stability degrading", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityWarn}% warning threshold.`, undefined, "stability");
+  } else {
+    alerts = resolveAlert(alerts, "stability", th.autoResolve);
+  }
+  if (batterySocPct < th.batterySocMinPct) {
+    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — below the ${th.batterySocMinPct}% reserve floor.`, undefined, "soc");
+  } else {
+    alerts = resolveAlert(alerts, "soc", th.autoResolve);
   }
   if (storm && rand() < 0.08) {
     alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.");
