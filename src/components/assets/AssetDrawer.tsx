@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { Activity, Gauge, Thermometer, Zap } from "lucide-react";
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { MaintenancePanel } from "@/components/assets/MaintenancePanel";
 import { StatusPill } from "@/components/ui-kit/StatusPill";
 import { useGrid } from "@/context/GridContext";
 import { amps, degc, kv, mw, nf, pct } from "@/utils/format";
@@ -37,7 +38,7 @@ function Bar({ label, value }: { label: string; value: number }) {
 
 /** Detail drawer for any grid asset (node or line), driven by the live simulation state. */
 export function AssetDrawer() {
-  const { state, selectedId, setSelectedId, fail } = useGrid();
+  const { state, selectedId, setSelectedId, fail, serviceNode } = useGrid();
   const node = state.nodes.find((n) => n.id === selectedId);
   const line = state.lines.find((l) => l.id === selectedId);
   const open = Boolean(node ?? line);
@@ -45,7 +46,7 @@ export function AssetDrawer() {
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && setSelectedId(null)}>
-      <SheetContent side="right" className="w-full border-border/60 bg-panel/95 backdrop-blur-xl sm:max-w-md">
+      <SheetContent side="right" className="w-full overflow-y-auto border-border/60 bg-panel/95 backdrop-blur-xl sm:max-w-md">
         {node ? (
           <>
             <SheetHeader>
@@ -91,6 +92,10 @@ export function AssetDrawer() {
                       </li>
                     ))}
                 </ul>
+              </div>
+              <div className="border-t border-border/50 pt-4">
+                <p className="mb-3 text-[10px] tracking-[0.16em] text-muted-foreground uppercase">Maintenance & condition</p>
+                <MaintenancePanel node={node} clock={state.clock} onService={() => serviceNode(node.id)} />
               </div>
               {node.status !== "failed" ? (
                 <button
