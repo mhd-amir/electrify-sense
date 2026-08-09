@@ -22,7 +22,7 @@ export const Route = createFileRoute("/alerts")({
 });
 
 function AlertsPage() {
-  const { state, acknowledge, setSelectedId } = useGrid();
+  const { state, ackAlert, setSelectedId } = useGrid();
   const open = state.alerts.filter((a) => !a.resolved);
 
   return (
@@ -64,7 +64,7 @@ function AlertsPage() {
                   </Button>
                 ) : null}
                 {!a.acknowledged ? (
-                  <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => acknowledge(a.id)}>
+                  <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => ackAlert(a.id)}>
                     Acknowledge
                   </Button>
                 ) : (
