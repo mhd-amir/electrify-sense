@@ -11,13 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AiPredictionsRouteImport } from './routes/ai-predictions'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as BatteryStorageRouteImport } from './routes/battery-storage'
 import { Route as ConsumersRouteImport } from './routes/consumers'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 import { Route as EvChargingRouteImport } from './routes/ev-charging'
+import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as PowerPlantsRouteImport } from './routes/power-plants'
 import { Route as RenewablesRouteImport } from './routes/renewables'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SubstationsRouteImport } from './routes/substations'
 import { Route as TelemetryRouteImport } from './routes/telemetry'
 import { Route as TransmissionLinesRouteImport } from './routes/transmission-lines'
@@ -30,6 +33,11 @@ const IndexRoute = IndexRouteImport.update({
 const AiPredictionsRoute = AiPredictionsRouteImport.update({
   id: '/ai-predictions',
   path: '/ai-predictions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AnalyticsRoute = AnalyticsRouteImport.update({
@@ -57,6 +65,11 @@ const EvChargingRoute = EvChargingRouteImport.update({
   path: '/ev-charging',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MaintenanceRoute = MaintenanceRouteImport.update({
+  id: '/maintenance',
+  path: '/maintenance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PowerPlantsRoute = PowerPlantsRouteImport.update({
   id: '/power-plants',
   path: '/power-plants',
@@ -65,6 +78,11 @@ const PowerPlantsRoute = PowerPlantsRouteImport.update({
 const RenewablesRoute = RenewablesRouteImport.update({
   id: '/renewables',
   path: '/renewables',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SubstationsRoute = SubstationsRouteImport.update({
@@ -86,13 +104,16 @@ const TransmissionLinesRoute = TransmissionLinesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai-predictions': typeof AiPredictionsRoute
+  '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/battery-storage': typeof BatteryStorageRoute
   '/consumers': typeof ConsumersRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/ev-charging': typeof EvChargingRoute
+  '/maintenance': typeof MaintenanceRoute
   '/power-plants': typeof PowerPlantsRoute
   '/renewables': typeof RenewablesRoute
+  '/settings': typeof SettingsRoute
   '/substations': typeof SubstationsRoute
   '/telemetry': typeof TelemetryRoute
   '/transmission-lines': typeof TransmissionLinesRoute
@@ -100,13 +121,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai-predictions': typeof AiPredictionsRoute
+  '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/battery-storage': typeof BatteryStorageRoute
   '/consumers': typeof ConsumersRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/ev-charging': typeof EvChargingRoute
+  '/maintenance': typeof MaintenanceRoute
   '/power-plants': typeof PowerPlantsRoute
   '/renewables': typeof RenewablesRoute
+  '/settings': typeof SettingsRoute
   '/substations': typeof SubstationsRoute
   '/telemetry': typeof TelemetryRoute
   '/transmission-lines': typeof TransmissionLinesRoute
@@ -115,13 +139,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ai-predictions': typeof AiPredictionsRoute
+  '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/battery-storage': typeof BatteryStorageRoute
   '/consumers': typeof ConsumersRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/ev-charging': typeof EvChargingRoute
+  '/maintenance': typeof MaintenanceRoute
   '/power-plants': typeof PowerPlantsRoute
   '/renewables': typeof RenewablesRoute
+  '/settings': typeof SettingsRoute
   '/substations': typeof SubstationsRoute
   '/telemetry': typeof TelemetryRoute
   '/transmission-lines': typeof TransmissionLinesRoute
@@ -131,13 +158,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai-predictions'
+    | '/alerts'
     | '/analytics'
     | '/battery-storage'
     | '/consumers'
     | '/digital-twin'
     | '/ev-charging'
+    | '/maintenance'
     | '/power-plants'
     | '/renewables'
+    | '/settings'
     | '/substations'
     | '/telemetry'
     | '/transmission-lines'
@@ -145,13 +175,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/ai-predictions'
+    | '/alerts'
     | '/analytics'
     | '/battery-storage'
     | '/consumers'
     | '/digital-twin'
     | '/ev-charging'
+    | '/maintenance'
     | '/power-plants'
     | '/renewables'
+    | '/settings'
     | '/substations'
     | '/telemetry'
     | '/transmission-lines'
@@ -159,13 +192,16 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/ai-predictions'
+    | '/alerts'
     | '/analytics'
     | '/battery-storage'
     | '/consumers'
     | '/digital-twin'
     | '/ev-charging'
+    | '/maintenance'
     | '/power-plants'
     | '/renewables'
+    | '/settings'
     | '/substations'
     | '/telemetry'
     | '/transmission-lines'
@@ -174,13 +210,16 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiPredictionsRoute: typeof AiPredictionsRoute
+  AlertsRoute: typeof AlertsRoute
   AnalyticsRoute: typeof AnalyticsRoute
   BatteryStorageRoute: typeof BatteryStorageRoute
   ConsumersRoute: typeof ConsumersRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
   EvChargingRoute: typeof EvChargingRoute
+  MaintenanceRoute: typeof MaintenanceRoute
   PowerPlantsRoute: typeof PowerPlantsRoute
   RenewablesRoute: typeof RenewablesRoute
+  SettingsRoute: typeof SettingsRoute
   SubstationsRoute: typeof SubstationsRoute
   TelemetryRoute: typeof TelemetryRoute
   TransmissionLinesRoute: typeof TransmissionLinesRoute
@@ -200,6 +239,13 @@ declare module '@tanstack/react-router' {
       path: '/ai-predictions'
       fullPath: '/ai-predictions'
       preLoaderRoute: typeof AiPredictionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics': {
@@ -237,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EvChargingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/maintenance': {
+      id: '/maintenance'
+      path: '/maintenance'
+      fullPath: '/maintenance'
+      preLoaderRoute: typeof MaintenanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/power-plants': {
       id: '/power-plants'
       path: '/power-plants'
@@ -249,6 +302,13 @@ declare module '@tanstack/react-router' {
       path: '/renewables'
       fullPath: '/renewables'
       preLoaderRoute: typeof RenewablesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/substations': {
@@ -278,13 +338,16 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiPredictionsRoute: AiPredictionsRoute,
+  AlertsRoute: AlertsRoute,
   AnalyticsRoute: AnalyticsRoute,
   BatteryStorageRoute: BatteryStorageRoute,
   ConsumersRoute: ConsumersRoute,
   DigitalTwinRoute: DigitalTwinRoute,
   EvChargingRoute: EvChargingRoute,
+  MaintenanceRoute: MaintenanceRoute,
   PowerPlantsRoute: PowerPlantsRoute,
   RenewablesRoute: RenewablesRoute,
+  SettingsRoute: SettingsRoute,
   SubstationsRoute: SubstationsRoute,
   TelemetryRoute: TelemetryRoute,
   TransmissionLinesRoute: TransmissionLinesRoute,
