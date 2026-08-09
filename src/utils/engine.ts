@@ -131,10 +131,19 @@ function pushAlert(
   title: string,
   detail: string,
   assetId?: string,
+  key?: string,
 ): GridAlert[] {
+  if (key && alerts.some((a) => a.key === key && !a.resolved)) return alerts;
   if (alerts.some((a) => a.title === title && Date.now() - a.ts < 25000)) return alerts;
-  const alert: GridAlert = { id: uid("alert"), ts: Date.now(), severity, title, detail, assetId, acknowledged: false };
+  const alert: GridAlert = { id: uid("alert"), ts: Date.now(), severity, title, detail, assetId, acknowledged: false, key };
   return [alert, ...alerts].slice(0, 60);
+}
+
+/** Auto-dismiss: marks any open alert with this key resolved once the metric is back in band. */
+function resolveAlert(alerts: GridAlert[], key: string, enabled: boolean): GridAlert[] {
+  if (!enabled) return alerts;
+  if (!alerts.some((a) => a.key === key && !a.resolved)) return alerts;
+  return alerts.map((a) => (a.key === key && !a.resolved ? { ...a, resolved: true, acknowledged: true } : a));
 }
 
 export function makeRecommendation(
