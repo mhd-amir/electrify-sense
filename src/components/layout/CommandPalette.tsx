@@ -96,7 +96,7 @@ export function CommandPalette() {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} title="Command palette" description="Search assets, run simulation commands and navigate">
+    <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput placeholder="Search assets, actions and pages…" />
       <CommandList className="max-h-[60vh]">
         <CommandEmpty>No matching asset or command.</CommandEmpty>
