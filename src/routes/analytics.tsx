@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Download, FileText } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -14,9 +14,11 @@ import {
 } from "recharts";
 
 import { Panel, PanelHeader } from "@/components/ui-kit/Panel";
+import { Button } from "@/components/ui/button";
 import { useGrid } from "@/context/GridContext";
 import type { Sample } from "@/types/grid";
 import { clockLabel, nf } from "@/utils/format";
+import { exportHistoryCsv, exportHistoryPdf } from "@/utils/export";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({
@@ -81,9 +83,17 @@ function AnalyticsPage() {
           icon={<BarChart3 className="size-4" />}
           subtitle={`Rolling window of the last ${data.length} simulated samples`}
           right={
-            <span className="tabular text-[11px] text-muted-foreground">
-              Peak demand {nf(Math.max(...data.map((d) => d.demandMw)))} MW
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="tabular hidden text-[11px] text-muted-foreground sm:inline">
+                Peak demand {nf(Math.max(...data.map((d) => d.demandMw)))} MW
+              </span>
+              <Button size="sm" variant="outline" className="h-8 gap-1 text-[11px]" onClick={() => exportHistoryCsv(state)}>
+                <Download className="size-3" /> CSV
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 gap-1 text-[11px]" onClick={() => void exportHistoryPdf(state)}>
+                <FileText className="size-3" /> PDF
+              </Button>
+            </div>
           }
         />
       </Panel>

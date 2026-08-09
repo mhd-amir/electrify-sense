@@ -1,8 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import type { GridState, Recommendation, Scenario } from "@/types/grid";
-import { applyRecommendation, createInitialState, injectFailure, restoreAll, step, systemAlert } from "@/utils/engine";
+import type { GridState, Recommendation, Scenario, Thresholds } from "@/types/grid";
+import { DEFAULT_THRESHOLDS, applyRecommendation, createInitialState, injectFailure, restoreAll, serviceAsset, step, systemAlert } from "@/utils/engine";
 import { clamp } from "@/utils/format";
+
+/** how many one-second snapshots the timeline scrubber keeps */
+export const REPLAY_WINDOW = 60;
 
 export interface DemoStage {
   label: string;
@@ -22,6 +25,11 @@ export const DEMO_STAGES: DemoStage[] = [
 
 interface GridContextValue {
   state: GridState;
+  /** always the live simulation state, even while replaying history */
+  live: GridState;
+  snapshots: GridState[];
+  scrubIndex: number | null;
+  scrubTo: (i: number | null) => void;
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
   start: () => void;
@@ -29,6 +37,9 @@ interface GridContextValue {
   reset: () => void;
   setSpeed: (s: GridState["speed"]) => void;
   setScenario: (s: Scenario) => void;
+  setThresholds: (patch: Partial<Thresholds>) => void;
+  resetThresholds: () => void;
+  serviceNode: (id: string) => void;
   nudgeDemand: (delta: number) => void;
   fail: (id: string) => void;
   restore: () => void;
@@ -45,11 +56,21 @@ const GridContext = createContext<GridContextValue | null>(null);
 export function GridProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<GridState>(() => createInitialState());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [snapshots, setSnapshots] = useState<GridState[]>([]);
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const demoTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     if (!state.running) return;
-    const interval = setInterval(() => setState((s) => step(s)), 1000 / state.speed);
+    const interval = setInterval(
+      () =>
+        setState((s) => {
+          const next = step(s);
+          setSnapshots((prev) => [...prev, next].slice(-REPLAY_WINDOW));
+          return next;
+        }),
+      1000 / state.speed,
+    );
     return () => clearInterval(interval);
   }, [state.running, state.speed]);
 
@@ -96,17 +117,40 @@ export function GridProvider({ children }: { children: ReactNode }) {
     };
 
     return {
-      state,
+      state: scrubIndex !== null ? (snapshots[scrubIndex] ?? state) : state,
+      live: state,
+      snapshots,
+      scrubIndex,
+      scrubTo: (i) => {
+        setScrubIndex(i);
+        if (i !== null) setState((s) => ({ ...s, running: false }));
+      },
       selectedId,
       setSelectedId,
-      start: () => setState((s) => ({ ...s, running: true })),
+      start: () => {
+        setScrubIndex(null);
+        setState((s) => ({ ...s, running: true }));
+      },
       pause: () => setState((s) => ({ ...s, running: false })),
       reset: () => {
         clearDemo();
+        setSnapshots([]);
+        setScrubIndex(null);
         setState(createInitialState());
         setSelectedId(null);
       },
       setSpeed: (speed) => setState((s) => ({ ...s, speed })),
+      setThresholds: (patch) => setState((s) => ({ ...s, thresholds: { ...s.thresholds, ...patch } })),
+      resetThresholds: () =>
+        setState((s) =>
+          systemAlert(
+            { ...s, thresholds: { ...DEFAULT_THRESHOLDS } },
+            "info",
+            "Alert thresholds restored to defaults",
+            "Frequency, voltage, temperature and stability trigger points reset to the operator baseline.",
+          ),
+        ),
+      serviceNode: (id) => setState((s) => serviceAsset(s, id)),
       setScenario: (scenario) =>
         setState((s) =>
           systemAlert(
@@ -149,7 +193,7 @@ export function GridProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, demoRunning: false, demoStep: -1 }));
       },
     };
-  }, [state, selectedId, clearDemo]);
+  }, [state, selectedId, snapshots, scrubIndex, clearDemo]);
 
   return <GridContext.Provider value={value}>{children}</GridContext.Provider>;
 }

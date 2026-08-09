@@ -1,4 +1,5 @@
 import { INITIAL_WEATHER, RENEWABLE_KINDS, SINK_KINDS, SOURCE_KINDS, createLines, createNodes } from "@/data/topology";
+import { conditionFor } from "@/data/maintenance";
 import type {
   GridAlert,
   GridLine,
@@ -9,9 +10,27 @@ import type {
   RecommendationAction,
   Scenario,
   Severity,
+  Thresholds,
 } from "@/types/grid";
-import { clamp, jitter, rand, resetRand } from "@/utils/format";
+import { DAY_MS, SIM_EPOCH, clamp, jitter, rand, resetRand } from "@/utils/format";
 import { lineStatus } from "@/utils/status";
+
+export { SIM_EPOCH };
+
+export const DEFAULT_THRESHOLDS: Thresholds = {
+  freqWarnHz: 0.15,
+  freqCritHz: 0.3,
+  voltageMinKv: 372,
+  voltageMaxKv: 415,
+  tempWarnC: 84,
+  tempCritC: 92,
+  stabilityWarn: 78,
+  stabilityCrit: 60,
+  lineWarnPct: 88,
+  lineCritPct: 100,
+  batterySocMinPct: 22,
+  autoResolve: true,
+};
 
 let seq = 0;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
@@ -40,9 +59,6 @@ function loadShape(hour: number) {
   const evening = Math.exp(-((hour - 20) ** 2) / 6);
   return 0.68 + 0.2 * morning + 0.3 * evening;
 }
-
-/** Fixed simulated start-of-day so SSR and client hydration agree (06:00 sim time). */
-export const SIM_EPOCH = Date.UTC(2026, 0, 12, 5, 0);
 
 export function createInitialState(): GridState {
   resetRand();
@@ -74,6 +90,7 @@ export function createInitialState(): GridState {
     },
     history: [],
     alerts: [],
+    thresholds: { ...DEFAULT_THRESHOLDS },
     recommendations: [],
     weather: { ...INITIAL_WEATHER },
     demoStep: -1,
@@ -114,10 +131,19 @@ function pushAlert(
   title: string,
   detail: string,
   assetId?: string,
+  key?: string,
 ): GridAlert[] {
+  if (key && alerts.some((a) => a.key === key && !a.resolved)) return alerts;
   if (alerts.some((a) => a.title === title && Date.now() - a.ts < 25000)) return alerts;
-  const alert: GridAlert = { id: uid("alert"), ts: Date.now(), severity, title, detail, assetId, acknowledged: false };
+  const alert: GridAlert = { id: uid("alert"), ts: Date.now(), severity, title, detail, assetId, acknowledged: false, key };
   return [alert, ...alerts].slice(0, 60);
+}
+
+/** Auto-dismiss: marks any open alert with this key resolved once the metric is back in band. */
+function resolveAlert(alerts: GridAlert[], key: string, enabled: boolean): GridAlert[] {
+  if (!enabled) return alerts;
+  if (!alerts.some((a) => a.key === key && !a.resolved)) return alerts;
+  return alerts.map((a) => (a.key === key && !a.resolved ? { ...a, resolved: true, acknowledged: true } : a));
 }
 
 export function makeRecommendation(
@@ -183,6 +209,7 @@ export function step(state: GridState, warmup = false): GridState {
 
   let alerts = state.alerts;
   let recommendations = state.recommendations;
+  const th = state.thresholds ?? DEFAULT_THRESHOLDS;
 
   // ---------- loads ----------
   const shape = loadShape(hour);
@@ -320,12 +347,16 @@ export function step(state: GridState, warmup = false): GridState {
     l.lossMw = Number(((l.flowMw * l.lengthKm) / 100000).toFixed(1));
     l.tempC = clamp(38 + l.loadPct * 0.35 + (heat ? 8 : 0) + jitter(1), 30, 132);
     const prev = l.status;
-    l.status = lineStatus(l.loadPct, false);
+    l.status = lineStatus(l.loadPct, false, th);
     if (l.status === "critical" && prev !== "critical") {
-      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating.`, l.id);
+      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating (limit ${th.lineCritPct}%).`, l.id, `line-crit:${l.id}`);
       recommendations = addRec(recommendations, makeRecommendation("shift-north", `${l.name} exceeded its thermal limit at ${l.loadPct}% loading.`));
     } else if (l.status === "warning" && prev === "normal") {
-      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id);
+      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id, `line-warn:${l.id}`);
+    }
+    if (l.status === "normal" || l.status === "heavy") {
+      alerts = resolveAlert(alerts, `line-crit:${l.id}`, th.autoResolve);
+      alerts = resolveAlert(alerts, `line-warn:${l.id}`, th.autoResolve);
     }
   }
 
@@ -339,12 +370,44 @@ export function step(state: GridState, warmup = false): GridState {
     n.tempC = clamp(n.tempC + jitter(0.5) + (heat ? 0.3 : -0.1) + (n.powerMw / n.capacityMw > 0.9 ? 0.4 : -0.1), 30, 118);
     if (n.status !== "failed") {
       const util = n.powerMw / n.capacityMw;
-      n.status = n.tempC > 92 ? "critical" : util > 1 ? "critical" : util > 0.9 ? "warning" : util > 0.78 ? "heavy" : "normal";
-      n.health = clamp(n.health + (n.tempC > 88 ? -0.06 : 0.02), 50, 100);
-      if (n.tempC > 92) {
-        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the 92 °C alarm limit.`, n.id);
+      n.status = n.tempC > th.tempCritC ? "critical" : util > 1 ? "critical" : n.tempC > th.tempWarnC ? "warning" : util > 0.9 ? "warning" : util > 0.78 ? "heavy" : "normal";
+      n.health = clamp(n.health + (n.tempC > th.tempWarnC ? -0.06 : 0.02), 50, 100);
+      if (n.tempC > th.tempCritC) {
+        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the ${th.tempCritC} °C alarm limit.`, n.id, `temp:${n.id}`);
         recommendations = addRec(recommendations, makeRecommendation("schedule-maintenance", `${n.name} transformer running hot for multiple intervals.`));
+      } else if (n.tempC < th.tempWarnC) {
+        alerts = resolveAlert(alerts, `temp:${n.id}`, th.autoResolve);
       }
+    }
+  }
+
+  // ---------- condition monitoring / maintenance wear ----------
+  for (const n of nodes) {
+    const m = n.maintenance;
+    const util = clamp(n.powerMw / Math.max(1, n.capacityMw), 0, 1.3);
+    const hours = (warmup ? 60 : 1) / 3600;
+    const sinceDays = Math.max(0, (clock - m.lastServiceTs) / DAY_MS);
+    const wearPct = clamp((sinceDays / m.intervalDays) * 100 * (1 + m.faults12m * 0.06) + (n.tempC > th.tempWarnC ? 0.4 : 0), 0, 160);
+    n.maintenance = {
+      ...m,
+      runtimeHours: Number((m.runtimeHours + hours * (n.status === "failed" ? 0 : 1)).toFixed(2)),
+      vibrationMm: Number(clamp(m.vibrationMm + jitter(0.02) + util * 0.002, 0.4, 9).toFixed(2)),
+      oilQualityPct: Number(clamp(m.oilQualityPct - (n.tempC > th.tempWarnC ? 0.01 : 0.001), 40, 100).toFixed(2)),
+      insulationMohm: Math.round(clamp(m.insulationMohm + jitter(1.2) - (n.tempC > th.tempCritC ? 0.6 : 0), 60, 1200)),
+      wearPct: Number(wearPct.toFixed(1)),
+      condition: conditionFor(wearPct, n.health),
+    };
+    if (n.maintenance.condition === "overdue") {
+      alerts = pushAlert(
+        alerts,
+        "warning",
+        `Maintenance overdue — ${n.name}`,
+        `Service window exceeded (${wearPct.toFixed(0)}% of interval, health ${n.health.toFixed(0)}%). Condition monitoring recommends intervention.`,
+        n.id,
+        `maint:${n.id}`,
+      );
+    } else {
+      alerts = resolveAlert(alerts, `maint:${n.id}`, th.autoResolve);
     }
   }
 
@@ -365,15 +428,32 @@ export function step(state: GridState, warmup = false): GridState {
   const healthScore = clamp(stability * 0.55 + avgHealth * 0.45 - failedAssets * 2, 15, 99);
   const aiConfidence = clamp(96 - failedAssets * 3.2 - (storm ? 5 : 0) - Math.abs(50 - frequencyHz) * 8 + jitter(0.6), 55, 99);
 
-  if (frequencyHz < 49.85) {
-    alerts = pushAlert(alerts, "critical", "System frequency below 49.85 Hz", `Frequency ${frequencyHz.toFixed(3)} Hz — generation deficit of ${Math.round(Math.max(0, demandMw - generationMw))} MW.`);
+  // ---------- threshold-driven alerting ----------
+  const freqDev = Math.abs(50 - frequencyHz);
+  if (freqDev > th.freqCritHz) {
+    alerts = pushAlert(alerts, "critical", `System frequency outside ${th.freqCritHz.toFixed(2)} Hz band`, `Frequency ${frequencyHz.toFixed(3)} Hz — imbalance of ${Math.round(Math.abs(demandMw - generationMw))} MW.`, undefined, "freq");
     recommendations = addRec(recommendations, makeRecommendation("boost-hydro", `Frequency at ${frequencyHz.toFixed(2)} Hz with falling reserve margin.`));
+  } else if (freqDev > th.freqWarnHz) {
+    alerts = pushAlert(alerts, "warning", `Frequency deviation ${freqDev.toFixed(2)} Hz`, `Frequency ${frequencyHz.toFixed(3)} Hz drifting beyond the ${th.freqWarnHz.toFixed(2)} Hz warning band.`, undefined, "freq");
+  } else {
+    alerts = resolveAlert(alerts, "freq", th.autoResolve);
   }
-  if (gridVoltage < 372) {
-    alerts = pushAlert(alerts, "warning", "Voltage drop detected on 400 kV bus", `Bus voltage ${gridVoltage.toFixed(1)} kV, below the 372 kV operating band.`);
+  if (gridVoltage < th.voltageMinKv || gridVoltage > th.voltageMaxKv) {
+    alerts = pushAlert(alerts, "warning", "Bus voltage outside operating band", `Bus voltage ${gridVoltage.toFixed(1)} kV against the ${th.voltageMinKv}–${th.voltageMaxKv} kV band.`, undefined, "voltage");
+  } else {
+    alerts = resolveAlert(alerts, "voltage", th.autoResolve);
   }
-  if (batterySocPct < 22) {
-    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — storage reserve nearly depleted.`);
+  if (stability < th.stabilityCrit) {
+    alerts = pushAlert(alerts, "critical", "Grid stability index critical", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityCrit}% emergency threshold.`, undefined, "stability");
+  } else if (stability < th.stabilityWarn) {
+    alerts = pushAlert(alerts, "warning", "Grid stability degrading", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityWarn}% warning threshold.`, undefined, "stability");
+  } else {
+    alerts = resolveAlert(alerts, "stability", th.autoResolve);
+  }
+  if (batterySocPct < th.batterySocMinPct) {
+    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — below the ${th.batterySocMinPct}% reserve floor.`, undefined, "soc");
+  } else {
+    alerts = resolveAlert(alerts, "soc", th.autoResolve);
   }
   if (storm && rand() < 0.08) {
     alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.");
@@ -452,6 +532,53 @@ export function restoreAll(state: GridState): GridState {
     nodes: state.nodes.map((n) => (n.status === "failed" ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
     lines: state.lines.map((l) => (l.status === "failed" ? { ...l, status: "normal" } : l)),
     alerts: pushAlert(state.alerts, "info", "Assets restored to service", "All tripped assets have been re-energised and are synchronising."),
+  };
+}
+
+/** Operator-triggered service: resets the maintenance clock and logs a service record. */
+export function serviceAsset(state: GridState, id: string): GridState {
+  const node = state.nodes.find((n) => n.id === id);
+  if (!node) return state;
+  const nodes: GridNode[] = state.nodes.map((n) => {
+    if (n.id !== id) return n;
+    const m = n.maintenance;
+    return {
+      ...n,
+      health: clamp(n.health + 6, 0, 100),
+      status: n.status === "failed" ? n.status : ("normal" as const),
+      maintenance: {
+        ...m,
+        lastServiceTs: state.clock,
+        nextServiceTs: state.clock + m.intervalDays * DAY_MS,
+        wearPct: 0,
+        condition: "good" as const,
+        oilQualityPct: clamp(m.oilQualityPct + 8, 0, 100),
+        vibrationMm: Number(Math.max(0.5, m.vibrationMm * 0.7).toFixed(2)),
+        history: [
+          {
+            id: uid("svc"),
+            ts: state.clock,
+            kind: "preventive" as const,
+            summary: "Operator-initiated preventive service from the digital twin",
+            technician: "Control room dispatch",
+            downtimeH: 2.5,
+            costLakh: 8.4,
+          },
+          ...m.history,
+        ].slice(0, 12),
+      },
+    };
+  });
+  return {
+    ...state,
+    nodes,
+    alerts: pushAlert(
+      state.alerts,
+      "info",
+      `Service completed on ${node.name}`,
+      `Maintenance clock reset; next window in ${node.maintenance.intervalDays} days.`,
+      node.id,
+    ),
   };
 }
 

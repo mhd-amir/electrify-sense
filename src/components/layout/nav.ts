@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Leaf,
   Settings,
+  Wrench,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -34,6 +35,7 @@ export const navItems: NavItem[] = [
   { to: "/renewables", label: "Renewables", icon: Leaf, group: "Assets" },
   { to: "/battery-storage", label: "Battery Storage", icon: BatteryCharging, group: "Assets" },
   { to: "/ev-charging", label: "EV Charging", icon: Activity, group: "Assets" },
+  { to: "/maintenance", label: "Maintenance", icon: Wrench, group: "Assets" },
   { to: "/ai-predictions", label: "AI Predictions", icon: Cpu, group: "Intelligence" },
   { to: "/alerts", label: "Alerts", icon: AlertTriangle, group: "Intelligence" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, group: "Intelligence" },
