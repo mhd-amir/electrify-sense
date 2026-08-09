@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Download, FileText } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -14,9 +14,11 @@ import {
 } from "recharts";
 
 import { Panel, PanelHeader } from "@/components/ui-kit/Panel";
+import { Button } from "@/components/ui/button";
 import { useGrid } from "@/context/GridContext";
 import type { Sample } from "@/types/grid";
 import { clockLabel, nf } from "@/utils/format";
+import { exportHistoryCsv, exportHistoryPdf } from "@/utils/export";
 
 export const Route = createFileRoute("/analytics")({
   head: () => ({
