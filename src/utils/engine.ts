@@ -535,6 +535,62 @@ export function restoreAll(state: GridState): GridState {
   };
 }
 
+/** Operator-triggered service: resets the maintenance clock and logs a service record. */
+export function serviceAsset(state: GridState, id: string): GridState {
+  const node = state.nodes.find((n) => n.id === id);
+  if (!node) return state;
+  const nodes = state.nodes.map((n) => {
+    if (n.id !== id) return n;
+    const m = n.maintenance;
+    return {
+      ...n,
+      health: clamp(n.health + 6, 0, 100),
+      status: n.status === "failed" ? n.status : "normal",
+      maintenance: {
+        ...m,
+        lastServiceTs: state.clock,
+        nextServiceTs: state.clock + m.intervalDays * DAY_MS,
+        wearPct: 0,
+        condition: "good" as const,
+        oilQualityPct: clamp(m.oilQualityPct + 8, 0, 100),
+        vibrationMm: Number(Math.max(0.5, m.vibrationMm * 0.7).toFixed(2)),
+        history: [
+          {
+            id: uid("svc"),
+            ts: state.clock,
+            kind: "preventive" as const,
+            summary: "Operator-initiated preventive service from the digital twin",
+            technician: "Control room dispatch",
+            downtimeH: 2.5,
+            costLakh: 8.4,
+          },
+          ...m.history,
+        ].slice(0, 12),
+      },
+    };
+  });
+  return {
+    ...state,
+    nodes,
+    alerts: pushAlert(
+      state.alerts,
+      "info",
+      `Service completed on ${node.name}`,
+      `Maintenance clock reset; next window in ${node.maintenance.intervalDays} days.`,
+      node.id,
+    ),
+  };
+}
+
+function _restoreAllLegacy(state: GridState): GridState {
+  return {
+    ...state,
+    nodes: state.nodes.map((n) => (n.status === "failed" ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
+    lines: state.lines.map((l) => (l.status === "failed" ? { ...l, status: "normal" } : l)),
+    alerts: pushAlert(state.alerts, "info", "Assets restored to service", "All tripped assets have been re-energised and are synchronising."),
+  };
+}
+
 export function applyRecommendation(state: GridState, rec: Recommendation): GridState {
   let nodes = state.nodes;
   switch (rec.action) {
