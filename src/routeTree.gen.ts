@@ -16,6 +16,7 @@ import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 import { Route as PowerPlantsRouteImport } from './routes/power-plants'
 import { Route as SubstationsRouteImport } from './routes/substations'
 import { Route as TelemetryRouteImport } from './routes/telemetry'
+import { Route as TransmissionLinesRouteImport } from './routes/transmission-lines'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,11 @@ const TelemetryRoute = TelemetryRouteImport.update({
   path: '/telemetry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransmissionLinesRoute = TransmissionLinesRouteImport.update({
+  id: '/transmission-lines',
+  path: '/transmission-lines',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/power-plants': typeof PowerPlantsRoute
   '/substations': typeof SubstationsRoute
   '/telemetry': typeof TelemetryRoute
+  '/transmission-lines': typeof TransmissionLinesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/power-plants': typeof PowerPlantsRoute
   '/substations': typeof SubstationsRoute
   '/telemetry': typeof TelemetryRoute
+  '/transmission-lines': typeof TransmissionLinesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/power-plants': typeof PowerPlantsRoute
   '/substations': typeof SubstationsRoute
   '/telemetry': typeof TelemetryRoute
+  '/transmission-lines': typeof TransmissionLinesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/power-plants'
     | '/substations'
     | '/telemetry'
+    | '/transmission-lines'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/power-plants'
     | '/substations'
     | '/telemetry'
+    | '/transmission-lines'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/power-plants'
     | '/substations'
     | '/telemetry'
+    | '/transmission-lines'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   PowerPlantsRoute: typeof PowerPlantsRoute
   SubstationsRoute: typeof SubstationsRoute
   TelemetryRoute: typeof TelemetryRoute
+  TransmissionLinesRoute: typeof TransmissionLinesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TelemetryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transmission-lines': {
+      id: '/transmission-lines'
+      path: '/transmission-lines'
+      fullPath: '/transmission-lines'
+      preLoaderRoute: typeof TransmissionLinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,17 +203,8 @@ const rootRouteChildren: RootRouteChildren = {
   PowerPlantsRoute: PowerPlantsRoute,
   SubstationsRoute: SubstationsRoute,
   TelemetryRoute: TelemetryRoute,
+  TransmissionLinesRoute: TransmissionLinesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
