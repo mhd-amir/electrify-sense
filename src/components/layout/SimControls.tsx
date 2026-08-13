@@ -217,7 +217,7 @@ function Btn({
 
   return (
     <motion.button
-      whileTap={disabled ? undefined : { scale: 0.96 }}
+      whileTap={{ scale: disabled ? 1 : 0.96 }}
       onClick={onClick}
       disabled={disabled}
       className={cn(
