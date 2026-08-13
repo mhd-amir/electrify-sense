@@ -117,6 +117,8 @@ export function createInitialState(): GridState {
     clock: SIM_EPOCH,
     scenario: "normal",
     demandBias: 0,
+    preset: "baseline",
+    renewableBias: 0,
     nodes,
     lines,
     metrics: {
