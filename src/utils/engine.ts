@@ -506,32 +506,32 @@ export function step(state: GridState, warmup = false): GridState {
   // ---------- threshold-driven alerting ----------
   const freqDev = Math.abs(50 - frequencyHz);
   if (freqDev > th.freqCritHz) {
-    alerts = pushAlert(alerts, "critical", `System frequency outside ${th.freqCritHz.toFixed(2)} Hz band`, `Frequency ${frequencyHz.toFixed(3)} Hz — imbalance of ${Math.round(Math.abs(demandMw - generationMw))} MW.`, undefined, "freq");
+    alerts = pushAlert(alerts, "critical", `System frequency outside ${th.freqCritHz.toFixed(2)} Hz band`, `Frequency ${frequencyHz.toFixed(3)} Hz — imbalance of ${Math.round(Math.abs(demandMw - generationMw))} MW.`, undefined, "freq", audit("FREQ-CRIT", "threshold", "Frequency deviation", th.freqCritHz, Number(freqDev.toFixed(3)), "Hz"), clock);
     recommendations = addRec(recommendations, makeRecommendation("boost-hydro", `Frequency at ${frequencyHz.toFixed(2)} Hz with falling reserve margin.`));
   } else if (freqDev > th.freqWarnHz) {
-    alerts = pushAlert(alerts, "warning", `Frequency deviation ${freqDev.toFixed(2)} Hz`, `Frequency ${frequencyHz.toFixed(3)} Hz drifting beyond the ${th.freqWarnHz.toFixed(2)} Hz warning band.`, undefined, "freq");
+    alerts = pushAlert(alerts, "warning", `Frequency deviation ${freqDev.toFixed(2)} Hz`, `Frequency ${frequencyHz.toFixed(3)} Hz drifting beyond the ${th.freqWarnHz.toFixed(2)} Hz warning band.`, undefined, "freq", audit("FREQ-WARN", "threshold", "Frequency deviation", th.freqWarnHz, Number(freqDev.toFixed(3)), "Hz"), clock);
   } else {
     alerts = resolveAlert(alerts, "freq", th.autoResolve);
   }
   if (gridVoltage < th.voltageMinKv || gridVoltage > th.voltageMaxKv) {
-    alerts = pushAlert(alerts, "warning", "Bus voltage outside operating band", `Bus voltage ${gridVoltage.toFixed(1)} kV against the ${th.voltageMinKv}–${th.voltageMaxKv} kV band.`, undefined, "voltage");
+    alerts = pushAlert(alerts, "warning", "Bus voltage outside operating band", `Bus voltage ${gridVoltage.toFixed(1)} kV against the ${th.voltageMinKv}–${th.voltageMaxKv} kV band.`, undefined, "voltage", audit(gridVoltage < th.voltageMinKv ? "VOLT-LOW" : "VOLT-HIGH", "threshold", "Bus voltage", gridVoltage < th.voltageMinKv ? th.voltageMinKv : th.voltageMaxKv, Number(gridVoltage.toFixed(1)), "kV"), clock);
   } else {
     alerts = resolveAlert(alerts, "voltage", th.autoResolve);
   }
   if (stability < th.stabilityCrit) {
-    alerts = pushAlert(alerts, "critical", "Grid stability index critical", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityCrit}% emergency threshold.`, undefined, "stability");
+    alerts = pushAlert(alerts, "critical", "Grid stability index critical", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityCrit}% emergency threshold.`, undefined, "stability", audit("STAB-CRIT", "threshold", "Stability index", th.stabilityCrit, Number(stability.toFixed(1)), "%"), clock);
   } else if (stability < th.stabilityWarn) {
-    alerts = pushAlert(alerts, "warning", "Grid stability degrading", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityWarn}% warning threshold.`, undefined, "stability");
+    alerts = pushAlert(alerts, "warning", "Grid stability degrading", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityWarn}% warning threshold.`, undefined, "stability", audit("STAB-WARN", "threshold", "Stability index", th.stabilityWarn, Number(stability.toFixed(1)), "%"), clock);
   } else {
     alerts = resolveAlert(alerts, "stability", th.autoResolve);
   }
   if (batterySocPct < th.batterySocMinPct) {
-    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — below the ${th.batterySocMinPct}% reserve floor.`, undefined, "soc");
+    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — below the ${th.batterySocMinPct}% reserve floor.`, undefined, "soc", audit("SOC-LOW", "threshold", "Fleet state of charge", th.batterySocMinPct, Number(batterySocPct.toFixed(1)), "%"), clock);
   } else {
     alerts = resolveAlert(alerts, "soc", th.autoResolve);
   }
   if (storm && rand() < 0.08) {
-    alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.");
+    alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.", undefined, undefined, audit("WIND-CUTOUT", "simulation", "Wind speed", 80, Math.round(weather.windKph), "kph"), clock);
   }
   if (demandMw > generationMw * 1.02) {
     recommendations = addRec(recommendations, makeRecommendation("discharge-battery", `Demand exceeds generation by ${Math.round(demandMw - generationMw)} MW.`));
