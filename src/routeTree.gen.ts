@@ -14,6 +14,7 @@ import { Route as AiPredictionsRouteImport } from './routes/ai-predictions'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as BatteryStorageRouteImport } from './routes/battery-storage'
+import { Route as BulkOperationsRouteImport } from './routes/bulk-operations'
 import { Route as ConsumersRouteImport } from './routes/consumers'
 import { Route as DigitalTwinRouteImport } from './routes/digital-twin'
 import { Route as EvChargingRouteImport } from './routes/ev-charging'
@@ -48,6 +49,11 @@ const AnalyticsRoute = AnalyticsRouteImport.update({
 const BatteryStorageRoute = BatteryStorageRouteImport.update({
   id: '/battery-storage',
   path: '/battery-storage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BulkOperationsRoute = BulkOperationsRouteImport.update({
+  id: '/bulk-operations',
+  path: '/bulk-operations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConsumersRoute = ConsumersRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/battery-storage': typeof BatteryStorageRoute
+  '/bulk-operations': typeof BulkOperationsRoute
   '/consumers': typeof ConsumersRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/ev-charging': typeof EvChargingRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/battery-storage': typeof BatteryStorageRoute
+  '/bulk-operations': typeof BulkOperationsRoute
   '/consumers': typeof ConsumersRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/ev-charging': typeof EvChargingRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/alerts': typeof AlertsRoute
   '/analytics': typeof AnalyticsRoute
   '/battery-storage': typeof BatteryStorageRoute
+  '/bulk-operations': typeof BulkOperationsRoute
   '/consumers': typeof ConsumersRoute
   '/digital-twin': typeof DigitalTwinRoute
   '/ev-charging': typeof EvChargingRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/analytics'
     | '/battery-storage'
+    | '/bulk-operations'
     | '/consumers'
     | '/digital-twin'
     | '/ev-charging'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/analytics'
     | '/battery-storage'
+    | '/bulk-operations'
     | '/consumers'
     | '/digital-twin'
     | '/ev-charging'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/analytics'
     | '/battery-storage'
+    | '/bulk-operations'
     | '/consumers'
     | '/digital-twin'
     | '/ev-charging'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   AlertsRoute: typeof AlertsRoute
   AnalyticsRoute: typeof AnalyticsRoute
   BatteryStorageRoute: typeof BatteryStorageRoute
+  BulkOperationsRoute: typeof BulkOperationsRoute
   ConsumersRoute: typeof ConsumersRoute
   DigitalTwinRoute: typeof DigitalTwinRoute
   EvChargingRoute: typeof EvChargingRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/battery-storage'
       fullPath: '/battery-storage'
       preLoaderRoute: typeof BatteryStorageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bulk-operations': {
+      id: '/bulk-operations'
+      path: '/bulk-operations'
+      fullPath: '/bulk-operations'
+      preLoaderRoute: typeof BulkOperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/consumers': {
@@ -341,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlertsRoute: AlertsRoute,
   AnalyticsRoute: AnalyticsRoute,
   BatteryStorageRoute: BatteryStorageRoute,
+  BulkOperationsRoute: BulkOperationsRoute,
   ConsumersRoute: ConsumersRoute,
   DigitalTwinRoute: DigitalTwinRoute,
   EvChargingRoute: EvChargingRoute,
