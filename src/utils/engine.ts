@@ -283,6 +283,7 @@ export function step(state: GridState, warmup = false): GridState {
   let recommendations = state.recommendations;
   const th = state.thresholds ?? DEFAULT_THRESHOLDS;
 
+  const rBias = clamp(1 + (state.renewableBias ?? 0), 0, 2);
   // ---------- loads ----------
   const shape = loadShape(hour);
   let demandMw = 0;
@@ -328,10 +329,10 @@ export function step(state: GridState, warmup = false): GridState {
       let factor: number;
       switch (n.kind) {
         case "solar":
-          factor = solarFactor(hour) * (storm ? 0.18 : heat ? 1.0 : 0.94);
+          factor = solarFactor(hour) * (storm ? 0.18 : heat ? 1.0 : 0.94) * rBias;
           break;
         case "wind":
-          factor = storm ? 0.14 : heat ? 0.16 : 0.42 + jitter(0.08);
+          factor = (storm ? 0.14 : heat ? 0.16 : 0.42 + jitter(0.08)) * rBias;
           break;
         case "hydro":
           factor = 0.58 + jitter(0.05) + (state.demandBias > 0 ? 0.12 : 0);
@@ -421,10 +422,10 @@ export function step(state: GridState, warmup = false): GridState {
     const prev = l.status;
     l.status = lineStatus(l.loadPct, false, th);
     if (l.status === "critical" && prev !== "critical") {
-      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating (limit ${th.lineCritPct}%).`, l.id, `line-crit:${l.id}`);
+      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating (limit ${th.lineCritPct}%).`, l.id, `line-crit:${l.id}`, audit("LINE-OVL", "threshold", "Corridor loading", th.lineCritPct, l.loadPct, "%"), clock);
       recommendations = addRec(recommendations, makeRecommendation("shift-north", `${l.name} exceeded its thermal limit at ${l.loadPct}% loading.`));
     } else if (l.status === "warning" && prev === "normal") {
-      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id, `line-warn:${l.id}`);
+      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id, `line-warn:${l.id}`, audit("LINE-HVY", "threshold", "Corridor loading", th.lineWarnPct, l.loadPct, "%"), clock);
     }
     if (l.status === "normal" || l.status === "heavy") {
       alerts = resolveAlert(alerts, `line-crit:${l.id}`, th.autoResolve);
@@ -445,7 +446,7 @@ export function step(state: GridState, warmup = false): GridState {
       n.status = n.tempC > th.tempCritC ? "critical" : util > 1 ? "critical" : n.tempC > th.tempWarnC ? "warning" : util > 0.9 ? "warning" : util > 0.78 ? "heavy" : "normal";
       n.health = clamp(n.health + (n.tempC > th.tempWarnC ? -0.06 : 0.02), 50, 100);
       if (n.tempC > th.tempCritC) {
-        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the ${th.tempCritC} °C alarm limit.`, n.id, `temp:${n.id}`);
+        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the ${th.tempCritC} °C alarm limit.`, n.id, `temp:${n.id}`, audit("THERM-HI", "threshold", "Top-oil temperature", th.tempCritC, Number(n.tempC.toFixed(1)), "°C"), clock);
         recommendations = addRec(recommendations, makeRecommendation("schedule-maintenance", `${n.name} transformer running hot for multiple intervals.`));
       } else if (n.tempC < th.tempWarnC) {
         alerts = resolveAlert(alerts, `temp:${n.id}`, th.autoResolve);
@@ -477,6 +478,8 @@ export function step(state: GridState, warmup = false): GridState {
         `Service window exceeded (${wearPct.toFixed(0)}% of interval, health ${n.health.toFixed(0)}%). Condition monitoring recommends intervention.`,
         n.id,
         `maint:${n.id}`,
+        audit("MAINT-DUE", "threshold", "Service interval consumed", 100, Number(wearPct.toFixed(1)), "%"),
+        clock,
       );
     } else {
       alerts = resolveAlert(alerts, `maint:${n.id}`, th.autoResolve);
