@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { RotateCcw, SlidersHorizontal } from "lucide-react";
+import { Lock, RotateCcw, ShieldCheck, SlidersHorizontal } from "lucide-react";
 
 import { Panel, PanelHeader } from "@/components/ui-kit/Panel";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useGrid } from "@/context/GridContext";
+import { ROLES, useRole } from "@/context/RoleContext";
 import type { Thresholds } from "@/types/grid";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -72,27 +74,81 @@ const GROUPS: { title: string; subtitle: string; fields: Field[] }[] = [
 
 function SettingsPage() {
   const { state, setThresholds, resetThresholds } = useGrid();
+  const { role, setRole, readOnly, setReadOnly, can } = useRole();
   const th = state.thresholds;
+  const canEdit = can("thresholds.edit");
 
   return (
     <div className="space-y-4">
+      <Panel>
+        <PanelHeader
+          title="Operator role & access"
+          icon={<ShieldCheck className="size-4" />}
+          subtitle="Your role tailors the dashboard and decides which control-room actions are available"
+          right={
+            <span className="text-[11px] text-muted-foreground">
+              {readOnly ? "Read-only mode active" : `${role.label} · ${role.permissions.length} permissions`}
+            </span>
+          }
+        />
+        <div className="grid gap-3 sm:grid-cols-3">
+          {ROLES.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setRole(r.id)}
+              className={cn(
+                "rounded-xl border p-3 text-left transition-colors",
+                role.id === r.id ? "border-info/50 bg-info/10" : "border-border/50 bg-panel-2/50 hover:border-info/30",
+              )}
+            >
+              <p className="text-sm font-semibold">{r.label}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{r.blurb}</p>
+              <ul className="mt-2 flex flex-wrap gap-1">
+                {r.permissions.map((p) => (
+                  <li key={p} className="rounded-full border border-border/50 px-1.5 py-0.5 text-[9px] tracking-wider text-muted-foreground uppercase">
+                    {p.replace(".", " ")}
+                  </li>
+                ))}
+              </ul>
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-border/50 bg-panel-2/50 p-3">
+          <div>
+            <p className="text-sm font-medium">Read-only mode</p>
+            <p className="text-[11px] text-muted-foreground">
+              Locks every simulation, failure, maintenance and threshold control — monitoring stays live.
+            </p>
+          </div>
+          <Switch checked={readOnly} onCheckedChange={setReadOnly} aria-label="Read-only mode" />
+        </div>
+      </Panel>
+
       <Panel>
         <PanelHeader
           title="Alert thresholds"
           icon={<SlidersHorizontal className="size-4" />}
           subtitle="Changes apply to the next simulation tick — alerts already raised resolve when metrics return inside the new band"
           right={
-            <Button size="sm" variant="outline" className="h-8 gap-1 text-[11px]" onClick={resetThresholds}>
+            <Button size="sm" variant="outline" className="h-8 gap-1 text-[11px]" onClick={resetThresholds} disabled={!canEdit}>
               <RotateCcw className="size-3" /> Restore defaults
             </Button>
           }
         />
+        {!canEdit ? (
+          <p className="mb-3 flex items-center gap-1.5 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-[11px] text-warn">
+            <Lock className="size-3.5" />
+            {readOnly
+              ? "Read-only mode is on — thresholds are locked."
+              : `Threshold tuning is restricted to the Engineer role. You are signed in as ${role.label}.`}
+          </p>
+        ) : null}
         <div className="flex items-center justify-between rounded-xl border border-border/50 bg-panel-2/50 p-3">
           <div>
             <p className="text-sm font-medium">Auto-dismiss resolved alerts</p>
             <p className="text-[11px] text-muted-foreground">Clear an alert automatically once its metric returns inside the configured band.</p>
           </div>
-          <Switch checked={th.autoResolve} onCheckedChange={(v) => setThresholds({ autoResolve: v })} aria-label="Auto-dismiss resolved alerts" />
+          <Switch checked={th.autoResolve} onCheckedChange={(v) => setThresholds({ autoResolve: v })} disabled={!canEdit} aria-label="Auto-dismiss resolved alerts" />
         </div>
       </Panel>
 
@@ -113,6 +169,7 @@ function SettingsPage() {
                   max={f.max}
                   step={f.step}
                   value={[th[f.key]]}
+                  disabled={!canEdit}
                   onValueChange={([v]) => setThresholds({ [f.key]: v ?? th[f.key] } as Partial<Thresholds>)}
                   aria-label={f.label}
                 />

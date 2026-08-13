@@ -1,7 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import type { GridState, Recommendation, Scenario, Thresholds } from "@/types/grid";
-import { DEFAULT_THRESHOLDS, applyRecommendation, createInitialState, injectFailure, restoreAll, serviceAsset, step, systemAlert } from "@/utils/engine";
+import type { GridState, Recommendation, Scenario, SimPreset, Thresholds } from "@/types/grid";
+import {
+  DEFAULT_THRESHOLDS,
+  applyPreset,
+  applyRecommendation,
+  createInitialState,
+  injectFailure,
+  injectFailures,
+  restoreAll,
+  serviceAsset,
+  serviceAssets,
+  setMaintenanceState,
+  step,
+  systemAlert,
+} from "@/utils/engine";
 import { clamp } from "@/utils/format";
 
 /** how many one-second snapshots the timeline scrubber keeps */
@@ -43,6 +56,11 @@ interface GridContextValue {
   nudgeDemand: (delta: number) => void;
   fail: (id: string) => void;
   restore: () => void;
+  failMany: (ids: string[]) => void;
+  restoreMany: (ids: string[]) => void;
+  serviceMany: (ids: string[]) => void;
+  setMaintenanceMode: (ids: string[], mode: "schedule" | "defer" | "inspect") => void;
+  setPreset: (preset: SimPreset) => void;
   acceptRec: (rec: Recommendation) => void;
   dismissRec: (id: string) => void;
   ackAlert: (id: string) => void;
@@ -171,6 +189,11 @@ export function GridProvider({ children }: { children: ReactNode }) {
       nudgeDemand: (delta) => setState((s) => ({ ...s, demandBias: clamp(Number((s.demandBias + delta).toFixed(2)), -0.3, 0.45) })),
       fail: (id) => setState((s) => injectFailure(s, id)),
       restore: () => setState((s) => restoreAll(s)),
+      failMany: (ids) => setState((s) => injectFailures(s, ids)),
+      restoreMany: (ids) => setState((s) => restoreAll(s, ids)),
+      serviceMany: (ids) => setState((s) => serviceAssets(s, ids)),
+      setMaintenanceMode: (ids, mode) => setState((s) => setMaintenanceState(s, ids, mode)),
+      setPreset: (preset) => setState((s) => applyPreset(s, preset)),
       acceptRec: (rec) => setState((s) => applyRecommendation(s, rec)),
       dismissRec: (id) =>
         setState((s) => {
@@ -185,7 +208,10 @@ export function GridProvider({ children }: { children: ReactNode }) {
             : next;
         }),
       ackAlert: (id) =>
-        setState((s) => ({ ...s, alerts: s.alerts.map((a) => (a.id === id ? { ...a, acknowledged: true } : a)) })),
+        setState((s) => ({
+          ...s,
+          alerts: s.alerts.map((a) => (a.id === id ? { ...a, acknowledged: true, ackTs: Date.now() } : a)),
+        })),
       clearAlerts: () => setState((s) => ({ ...s, alerts: [] })),
       startDemo,
       stopDemo: () => {

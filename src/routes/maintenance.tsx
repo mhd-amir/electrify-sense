@@ -5,6 +5,7 @@ import { Panel, PanelHeader } from "@/components/ui-kit/Panel";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useGrid } from "@/context/GridContext";
+import { useRole } from "@/context/RoleContext";
 import { daysBetween, pct } from "@/utils/format";
 import { conditionClasses, conditionLabel, kindLabel } from "@/utils/status";
 
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/maintenance")({
 
 function MaintenancePage() {
   const { state, setSelectedId, serviceNode } = useGrid();
+  const { can } = useRole();
   const rows = [...state.nodes].sort((a, b) => a.maintenance.nextServiceTs - b.maintenance.nextServiceTs);
   const overdue = rows.filter((n) => n.maintenance.condition === "overdue").length;
   const attention = rows.filter((n) => n.maintenance.condition === "attention").length;
@@ -86,7 +88,7 @@ function MaintenancePage() {
                   <td className="tabular py-2 pr-3">{m.faults12m}</td>
                   <td className="tabular py-2 pr-3">{m.mtbfDays} d</td>
                   <td className="py-2">
-                    <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => serviceNode(n.id)}>
+                    <Button size="sm" variant="outline" className="h-7 text-[11px]" disabled={!can("maintenance.service")} onClick={() => serviceNode(n.id)}>
                       Service
                     </Button>
                   </td>

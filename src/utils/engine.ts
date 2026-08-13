@@ -2,6 +2,7 @@ import { INITIAL_WEATHER, RENEWABLE_KINDS, SINK_KINDS, SOURCE_KINDS, createLines
 import { conditionFor } from "@/data/maintenance";
 import type {
   GridAlert,
+  AlertAudit,
   GridLine,
   GridNode,
   GridState,
@@ -10,6 +11,7 @@ import type {
   RecommendationAction,
   Scenario,
   Severity,
+  SimPreset,
   Thresholds,
 } from "@/types/grid";
 import { DAY_MS, SIM_EPOCH, clamp, jitter, rand, resetRand } from "@/utils/format";
@@ -31,6 +33,50 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   batterySocMinPct: 22,
   autoResolve: true,
 };
+
+export interface PresetSpec {
+  id: SimPreset;
+  label: string;
+  detail: string;
+  scenario: Scenario;
+  demandBias: number;
+  renewableBias: number;
+}
+
+export const SIM_PRESETS: PresetSpec[] = [
+  {
+    id: "baseline",
+    label: "Baseline",
+    detail: "Seasonal-normal weather, nominal dispatch, demand at forecast.",
+    scenario: "normal",
+    demandBias: 0,
+    renewableBias: 0,
+  },
+  {
+    id: "high-demand",
+    label: "High demand",
+    detail: "Evening peak plus heatwave cooling load — reserves squeezed.",
+    scenario: "heatwave",
+    demandBias: 0.22,
+    renewableBias: -0.1,
+  },
+  {
+    id: "renewable-spike",
+    label: "Renewable spike",
+    detail: "Exceptional wind and irradiance — surplus infeed and low inertia.",
+    scenario: "normal",
+    demandBias: -0.12,
+    renewableBias: 0.75,
+  },
+  {
+    id: "brownout-risk",
+    label: "Brownout risk",
+    detail: "Extreme demand with collapsed renewables — voltage and frequency stress.",
+    scenario: "heatwave",
+    demandBias: 0.38,
+    renewableBias: -0.55,
+  },
+];
 
 let seq = 0;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
@@ -71,6 +117,8 @@ export function createInitialState(): GridState {
     clock: SIM_EPOCH,
     scenario: "normal",
     demandBias: 0,
+    preset: "baseline",
+    renewableBias: 0,
     nodes,
     lines,
     metrics: {
@@ -132,10 +180,23 @@ function pushAlert(
   detail: string,
   assetId?: string,
   key?: string,
+  audit?: AlertAudit,
+  simTs?: number,
 ): GridAlert[] {
   if (key && alerts.some((a) => a.key === key && !a.resolved)) return alerts;
   if (alerts.some((a) => a.title === title && Date.now() - a.ts < 25000)) return alerts;
-  const alert: GridAlert = { id: uid("alert"), ts: Date.now(), severity, title, detail, assetId, acknowledged: false, key };
+  const alert: GridAlert = {
+    id: uid("alert"),
+    ts: Date.now(),
+    severity,
+    title,
+    detail,
+    assetId,
+    acknowledged: false,
+    key,
+    simTs,
+    audit: audit ?? { reasonCode: "SYS-INFO", source: "simulation" },
+  };
   return [alert, ...alerts].slice(0, 60);
 }
 
@@ -143,8 +204,19 @@ function pushAlert(
 function resolveAlert(alerts: GridAlert[], key: string, enabled: boolean): GridAlert[] {
   if (!enabled) return alerts;
   if (!alerts.some((a) => a.key === key && !a.resolved)) return alerts;
-  return alerts.map((a) => (a.key === key && !a.resolved ? { ...a, resolved: true, acknowledged: true } : a));
+  return alerts.map((a) =>
+    a.key === key && !a.resolved ? { ...a, resolved: true, acknowledged: true, resolvedTs: Date.now() } : a,
+  );
 }
+
+const audit = (
+  reasonCode: string,
+  source: AlertAudit["source"],
+  metric?: string,
+  thresholdValue?: number,
+  actualValue?: number,
+  unit?: string,
+): AlertAudit => ({ reasonCode, source, metric, thresholdValue, actualValue, unit });
 
 export function makeRecommendation(
   action: RecommendationAction,
@@ -211,6 +283,7 @@ export function step(state: GridState, warmup = false): GridState {
   let recommendations = state.recommendations;
   const th = state.thresholds ?? DEFAULT_THRESHOLDS;
 
+  const rBias = clamp(1 + (state.renewableBias ?? 0), 0, 2);
   // ---------- loads ----------
   const shape = loadShape(hour);
   let demandMw = 0;
@@ -256,10 +329,10 @@ export function step(state: GridState, warmup = false): GridState {
       let factor: number;
       switch (n.kind) {
         case "solar":
-          factor = solarFactor(hour) * (storm ? 0.18 : heat ? 1.0 : 0.94);
+          factor = solarFactor(hour) * (storm ? 0.18 : heat ? 1.0 : 0.94) * rBias;
           break;
         case "wind":
-          factor = storm ? 0.14 : heat ? 0.16 : 0.42 + jitter(0.08);
+          factor = (storm ? 0.14 : heat ? 0.16 : 0.42 + jitter(0.08)) * rBias;
           break;
         case "hydro":
           factor = 0.58 + jitter(0.05) + (state.demandBias > 0 ? 0.12 : 0);
@@ -349,10 +422,10 @@ export function step(state: GridState, warmup = false): GridState {
     const prev = l.status;
     l.status = lineStatus(l.loadPct, false, th);
     if (l.status === "critical" && prev !== "critical") {
-      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating (limit ${th.lineCritPct}%).`, l.id, `line-crit:${l.id}`);
+      alerts = pushAlert(alerts, "critical", `Overload on ${l.name}`, `Corridor loading at ${l.loadPct}% of ${l.capacityMw} MW thermal rating (limit ${th.lineCritPct}%).`, l.id, `line-crit:${l.id}`, audit("LINE-OVL", "threshold", "Corridor loading", th.lineCritPct, l.loadPct, "%"), clock);
       recommendations = addRec(recommendations, makeRecommendation("shift-north", `${l.name} exceeded its thermal limit at ${l.loadPct}% loading.`));
     } else if (l.status === "warning" && prev === "normal") {
-      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id, `line-warn:${l.id}`);
+      alerts = pushAlert(alerts, "warning", `Heavy load on ${l.name}`, `Loading ${l.loadPct}%, conductor temperature ${l.tempC.toFixed(0)} °C.`, l.id, `line-warn:${l.id}`, audit("LINE-HVY", "threshold", "Corridor loading", th.lineWarnPct, l.loadPct, "%"), clock);
     }
     if (l.status === "normal" || l.status === "heavy") {
       alerts = resolveAlert(alerts, `line-crit:${l.id}`, th.autoResolve);
@@ -373,7 +446,7 @@ export function step(state: GridState, warmup = false): GridState {
       n.status = n.tempC > th.tempCritC ? "critical" : util > 1 ? "critical" : n.tempC > th.tempWarnC ? "warning" : util > 0.9 ? "warning" : util > 0.78 ? "heavy" : "normal";
       n.health = clamp(n.health + (n.tempC > th.tempWarnC ? -0.06 : 0.02), 50, 100);
       if (n.tempC > th.tempCritC) {
-        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the ${th.tempCritC} °C alarm limit.`, n.id, `temp:${n.id}`);
+        alerts = pushAlert(alerts, "critical", `Transformer temperature rising at ${n.name}`, `Top-oil temperature ${n.tempC.toFixed(0)} °C exceeds the ${th.tempCritC} °C alarm limit.`, n.id, `temp:${n.id}`, audit("THERM-HI", "threshold", "Top-oil temperature", th.tempCritC, Number(n.tempC.toFixed(1)), "°C"), clock);
         recommendations = addRec(recommendations, makeRecommendation("schedule-maintenance", `${n.name} transformer running hot for multiple intervals.`));
       } else if (n.tempC < th.tempWarnC) {
         alerts = resolveAlert(alerts, `temp:${n.id}`, th.autoResolve);
@@ -405,6 +478,8 @@ export function step(state: GridState, warmup = false): GridState {
         `Service window exceeded (${wearPct.toFixed(0)}% of interval, health ${n.health.toFixed(0)}%). Condition monitoring recommends intervention.`,
         n.id,
         `maint:${n.id}`,
+        audit("MAINT-DUE", "threshold", "Service interval consumed", 100, Number(wearPct.toFixed(1)), "%"),
+        clock,
       );
     } else {
       alerts = resolveAlert(alerts, `maint:${n.id}`, th.autoResolve);
@@ -431,32 +506,32 @@ export function step(state: GridState, warmup = false): GridState {
   // ---------- threshold-driven alerting ----------
   const freqDev = Math.abs(50 - frequencyHz);
   if (freqDev > th.freqCritHz) {
-    alerts = pushAlert(alerts, "critical", `System frequency outside ${th.freqCritHz.toFixed(2)} Hz band`, `Frequency ${frequencyHz.toFixed(3)} Hz — imbalance of ${Math.round(Math.abs(demandMw - generationMw))} MW.`, undefined, "freq");
+    alerts = pushAlert(alerts, "critical", `System frequency outside ${th.freqCritHz.toFixed(2)} Hz band`, `Frequency ${frequencyHz.toFixed(3)} Hz — imbalance of ${Math.round(Math.abs(demandMw - generationMw))} MW.`, undefined, "freq", audit("FREQ-CRIT", "threshold", "Frequency deviation", th.freqCritHz, Number(freqDev.toFixed(3)), "Hz"), clock);
     recommendations = addRec(recommendations, makeRecommendation("boost-hydro", `Frequency at ${frequencyHz.toFixed(2)} Hz with falling reserve margin.`));
   } else if (freqDev > th.freqWarnHz) {
-    alerts = pushAlert(alerts, "warning", `Frequency deviation ${freqDev.toFixed(2)} Hz`, `Frequency ${frequencyHz.toFixed(3)} Hz drifting beyond the ${th.freqWarnHz.toFixed(2)} Hz warning band.`, undefined, "freq");
+    alerts = pushAlert(alerts, "warning", `Frequency deviation ${freqDev.toFixed(2)} Hz`, `Frequency ${frequencyHz.toFixed(3)} Hz drifting beyond the ${th.freqWarnHz.toFixed(2)} Hz warning band.`, undefined, "freq", audit("FREQ-WARN", "threshold", "Frequency deviation", th.freqWarnHz, Number(freqDev.toFixed(3)), "Hz"), clock);
   } else {
     alerts = resolveAlert(alerts, "freq", th.autoResolve);
   }
   if (gridVoltage < th.voltageMinKv || gridVoltage > th.voltageMaxKv) {
-    alerts = pushAlert(alerts, "warning", "Bus voltage outside operating band", `Bus voltage ${gridVoltage.toFixed(1)} kV against the ${th.voltageMinKv}–${th.voltageMaxKv} kV band.`, undefined, "voltage");
+    alerts = pushAlert(alerts, "warning", "Bus voltage outside operating band", `Bus voltage ${gridVoltage.toFixed(1)} kV against the ${th.voltageMinKv}–${th.voltageMaxKv} kV band.`, undefined, "voltage", audit(gridVoltage < th.voltageMinKv ? "VOLT-LOW" : "VOLT-HIGH", "threshold", "Bus voltage", gridVoltage < th.voltageMinKv ? th.voltageMinKv : th.voltageMaxKv, Number(gridVoltage.toFixed(1)), "kV"), clock);
   } else {
     alerts = resolveAlert(alerts, "voltage", th.autoResolve);
   }
   if (stability < th.stabilityCrit) {
-    alerts = pushAlert(alerts, "critical", "Grid stability index critical", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityCrit}% emergency threshold.`, undefined, "stability");
+    alerts = pushAlert(alerts, "critical", "Grid stability index critical", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityCrit}% emergency threshold.`, undefined, "stability", audit("STAB-CRIT", "threshold", "Stability index", th.stabilityCrit, Number(stability.toFixed(1)), "%"), clock);
   } else if (stability < th.stabilityWarn) {
-    alerts = pushAlert(alerts, "warning", "Grid stability degrading", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityWarn}% warning threshold.`, undefined, "stability");
+    alerts = pushAlert(alerts, "warning", "Grid stability degrading", `Stability at ${stability.toFixed(0)}%, below the ${th.stabilityWarn}% warning threshold.`, undefined, "stability", audit("STAB-WARN", "threshold", "Stability index", th.stabilityWarn, Number(stability.toFixed(1)), "%"), clock);
   } else {
     alerts = resolveAlert(alerts, "stability", th.autoResolve);
   }
   if (batterySocPct < th.batterySocMinPct) {
-    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — below the ${th.batterySocMinPct}% reserve floor.`, undefined, "soc");
+    alerts = pushAlert(alerts, "warning", "Battery state of charge low", `Fleet SoC at ${batterySocPct.toFixed(0)}% — below the ${th.batterySocMinPct}% reserve floor.`, undefined, "soc", audit("SOC-LOW", "threshold", "Fleet state of charge", th.batterySocMinPct, Number(batterySocPct.toFixed(1)), "%"), clock);
   } else {
     alerts = resolveAlert(alerts, "soc", th.autoResolve);
   }
   if (storm && rand() < 0.08) {
-    alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.");
+    alerts = pushAlert(alerts, "warning", "Wind output falling rapidly", "Gale gusts above cut-out speed; turbines feathering across two clusters.", undefined, undefined, audit("WIND-CUTOUT", "simulation", "Wind speed", 80, Math.round(weather.windKph), "kph"), clock);
   }
   if (demandMw > generationMw * 1.02) {
     recommendations = addRec(recommendations, makeRecommendation("discharge-battery", `Demand exceeds generation by ${Math.round(demandMw - generationMw)} MW.`));
@@ -495,6 +570,9 @@ export function injectFailure(state: GridState, targetId: string): GridState {
       `Trip on ${line.name}`,
       `Protection operated at ${line.loadPct}% loading. ${line.flowMw.toFixed(0)} MW rerouting to adjacent corridors.`,
       line.id,
+      undefined,
+      audit("TRIP-MANUAL", "operator", "Corridor loading", state.thresholds.lineCritPct, line.loadPct, "%"),
+      state.clock,
     );
     return {
       ...state,
@@ -514,6 +592,9 @@ export function injectFailure(state: GridState, targetId: string): GridState {
     `${node.name} offline`,
     `Asset tripped from service. ${node.powerMw.toFixed(0)} MW lost from the ${node.region} grid.`,
     node.id,
+    undefined,
+    audit("TRIP-MANUAL", "operator", "Asset infeed", 0, Math.round(node.powerMw), "MW"),
+    state.clock,
   );
   return {
     ...state,
@@ -526,12 +607,105 @@ export function injectFailure(state: GridState, targetId: string): GridState {
   };
 }
 
-export function restoreAll(state: GridState): GridState {
+export function restoreAll(state: GridState, ids?: string[]): GridState {
+  const hit = (id: string) => !ids || ids.includes(id);
   return {
     ...state,
-    nodes: state.nodes.map((n) => (n.status === "failed" ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
-    lines: state.lines.map((l) => (l.status === "failed" ? { ...l, status: "normal" } : l)),
-    alerts: pushAlert(state.alerts, "info", "Assets restored to service", "All tripped assets have been re-energised and are synchronising."),
+    nodes: state.nodes.map((n) => (n.status === "failed" && hit(n.id) ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
+    lines: state.lines.map((l) => (l.status === "failed" && hit(l.id) ? { ...l, status: "normal" } : l)),
+    alerts: pushAlert(
+      state.alerts,
+      "info",
+      ids ? `Restored ${ids.length} selected asset${ids.length === 1 ? "" : "s"}` : "Assets restored to service",
+      "Tripped assets have been re-energised and are synchronising.",
+      undefined,
+      undefined,
+      audit("OPS-RESTORE", "operator"),
+      state.clock,
+    ),
+  };
+}
+
+/** Bulk failure injection across many assets in one operator action. */
+export function injectFailures(state: GridState, ids: string[]): GridState {
+  let next = state;
+  for (const id of ids) next = injectFailure(next, id);
+  return next;
+}
+
+/** Bulk service across many nodes. */
+export function serviceAssets(state: GridState, ids: string[]): GridState {
+  let next = state;
+  for (const id of ids) next = serviceAsset(next, id);
+  return next;
+}
+
+/** Bulk maintenance state change: schedule work now, defer, or flag for inspection. */
+export function setMaintenanceState(state: GridState, ids: string[], mode: "schedule" | "defer" | "inspect"): GridState {
+  const nodes = state.nodes.map((n) => {
+    if (!ids.includes(n.id)) return n;
+    const m = n.maintenance;
+    if (mode === "schedule") {
+      return { ...n, maintenance: { ...m, nextServiceTs: state.clock + 2 * DAY_MS, condition: "attention" as const } };
+    }
+    if (mode === "defer") {
+      return { ...n, maintenance: { ...m, nextServiceTs: m.nextServiceTs + 30 * DAY_MS } };
+    }
+    return {
+      ...n,
+      maintenance: {
+        ...m,
+        history: [
+          {
+            id: uid("svc"),
+            ts: state.clock,
+            kind: "inspection" as const,
+            summary: "Bulk inspection raised from the control room asset selection",
+            technician: "Field inspection crew",
+            downtimeH: 0.5,
+            costLakh: 1.2,
+          },
+          ...m.history,
+        ].slice(0, 12),
+      },
+    };
+  });
+  const label = mode === "schedule" ? "scheduled for service" : mode === "defer" ? "service deferred 30 days" : "inspection raised";
+  return {
+    ...state,
+    nodes,
+    alerts: pushAlert(
+      state.alerts,
+      "info",
+      `${ids.length} asset${ids.length === 1 ? "" : "s"} — ${label}`,
+      "Bulk maintenance state change applied from the control room.",
+      undefined,
+      undefined,
+      audit("OPS-MAINT-BULK", "operator"),
+      state.clock,
+    ),
+  };
+}
+
+/** Apply a simulation preset (scenario, demand bias and renewable bias in one action). */
+export function applyPreset(state: GridState, id: SimPreset): GridState {
+  const p = SIM_PRESETS.find((x) => x.id === id) ?? SIM_PRESETS[0]!;
+  return {
+    ...state,
+    preset: p.id,
+    scenario: p.scenario,
+    demandBias: p.demandBias,
+    renewableBias: p.renewableBias,
+    alerts: pushAlert(
+      state.alerts,
+      p.id === "baseline" ? "info" : "warning",
+      `Simulation preset: ${p.label}`,
+      p.detail,
+      undefined,
+      undefined,
+      audit("OPS-PRESET", "operator"),
+      state.clock,
+    ),
   };
 }
 
@@ -578,6 +752,9 @@ export function serviceAsset(state: GridState, id: string): GridState {
       `Service completed on ${node.name}`,
       `Maintenance clock reset; next window in ${node.maintenance.intervalDays} days.`,
       node.id,
+      undefined,
+      audit("OPS-SERVICE", "operator"),
+      state.clock,
     ),
   };
 }
@@ -605,10 +782,10 @@ export function applyRecommendation(state: GridState, rec: Recommendation): Grid
     ...state,
     nodes,
     recommendations: state.recommendations.map((r) => (r.id === rec.id ? { ...r, state: "accepted" } : r)),
-    alerts: pushAlert(state.alerts, "info", `Action executed: ${rec.title}`, `${rec.impact} (operator accepted, confidence ${rec.confidence}%).`),
+    alerts: pushAlert(state.alerts, "info", `Action executed: ${rec.title}`, `${rec.impact} (operator accepted, confidence ${rec.confidence}%).`, undefined, undefined, audit("AI-ACCEPT", "ai", "Confidence", 70, rec.confidence, "%"), state.clock),
   };
 }
 
 export function systemAlert(state: GridState, severity: Severity, title: string, detail: string): GridState {
-  return { ...state, alerts: pushAlert(state.alerts, severity, title, detail) };
+  return { ...state, alerts: pushAlert(state.alerts, severity, title, detail, undefined, undefined, audit("OPS-ACTION", "operator"), state.clock) };
 }

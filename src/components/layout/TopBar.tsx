@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { BellRing, CloudLightning, Gauge, PanelRight, Sun, Thermometer, Wind } from "lucide-react";
 
 import { AnimatedNumber } from "@/components/ui-kit/AnimatedNumber";
+import { RoleSwitcher } from "@/components/layout/RoleSwitcher";
 import { useGrid } from "@/context/GridContext";
 import { cn } from "@/lib/utils";
 import { clockLabel, dateLabel } from "@/utils/format";
@@ -39,6 +40,7 @@ export function TopBar({ onToggleAlerts, alertsOpen }: { onToggleAlerts: () => v
       </div>
 
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <RoleSwitcher />
         <Metric label="Frequency" value={metrics.frequencyHz} decimals={3} unit="Hz" warn={Math.abs(50 - metrics.frequencyHz) > 0.15} />
         <Metric label="AI confidence" value={metrics.aiConfidence} decimals={0} unit="%" />
         <div className={cn("hidden items-center gap-2 rounded-xl border px-3 py-2 sm:flex", tone.cls)}>

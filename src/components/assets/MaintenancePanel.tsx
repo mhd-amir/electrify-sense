@@ -1,17 +1,11 @@
 import { Wrench } from "lucide-react";
 
+import { MaintenanceTimeline } from "@/components/assets/MaintenanceTimeline";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import type { GridNode } from "@/types/grid";
 import { dateTimeLabel, daysBetween } from "@/utils/format";
 import { conditionClasses, conditionLabel } from "@/utils/status";
-
-const kindLabels: Record<string, string> = {
-  preventive: "Preventive",
-  corrective: "Corrective",
-  inspection: "Inspection",
-  upgrade: "Upgrade",
-};
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -62,21 +56,10 @@ export function MaintenancePanel({ node, clock, onService }: { node: GridNode; c
       </div>
 
       <div>
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Service history</p>
-        <ol className="space-y-2">
-          {m.history.map((r) => (
-            <li key={r.id} className="rounded-md border border-border/50 bg-card/40 p-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-foreground">{kindLabels[r.kind] ?? r.kind}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">{dateTimeLabel(r.ts)}</span>
-              </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{r.summary}</p>
-              <p className="mt-1 font-mono text-[10px] text-muted-foreground/80">
-                {r.technician} · {r.downtimeH.toFixed(1)} h downtime · ₹{r.costLakh.toFixed(1)} L
-              </p>
-            </li>
-          ))}
-        </ol>
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Service timeline & mean time between events
+        </p>
+        <MaintenanceTimeline node={node} clock={clock} />
       </div>
     </div>
   );
