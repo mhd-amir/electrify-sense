@@ -2,6 +2,7 @@ import { INITIAL_WEATHER, RENEWABLE_KINDS, SINK_KINDS, SOURCE_KINDS, createLines
 import { conditionFor } from "@/data/maintenance";
 import type {
   GridAlert,
+  AlertAudit,
   GridLine,
   GridNode,
   GridState,
@@ -10,6 +11,7 @@ import type {
   RecommendationAction,
   Scenario,
   Severity,
+  SimPreset,
   Thresholds,
 } from "@/types/grid";
 import { DAY_MS, SIM_EPOCH, clamp, jitter, rand, resetRand } from "@/utils/format";
@@ -31,6 +33,50 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   batterySocMinPct: 22,
   autoResolve: true,
 };
+
+export interface PresetSpec {
+  id: SimPreset;
+  label: string;
+  detail: string;
+  scenario: Scenario;
+  demandBias: number;
+  renewableBias: number;
+}
+
+export const SIM_PRESETS: PresetSpec[] = [
+  {
+    id: "baseline",
+    label: "Baseline",
+    detail: "Seasonal-normal weather, nominal dispatch, demand at forecast.",
+    scenario: "normal",
+    demandBias: 0,
+    renewableBias: 0,
+  },
+  {
+    id: "high-demand",
+    label: "High demand",
+    detail: "Evening peak plus heatwave cooling load — reserves squeezed.",
+    scenario: "heatwave",
+    demandBias: 0.22,
+    renewableBias: -0.1,
+  },
+  {
+    id: "renewable-spike",
+    label: "Renewable spike",
+    detail: "Exceptional wind and irradiance — surplus infeed and low inertia.",
+    scenario: "normal",
+    demandBias: -0.12,
+    renewableBias: 0.75,
+  },
+  {
+    id: "brownout-risk",
+    label: "Brownout risk",
+    detail: "Extreme demand with collapsed renewables — voltage and frequency stress.",
+    scenario: "heatwave",
+    demandBias: 0.38,
+    renewableBias: -0.55,
+  },
+];
 
 let seq = 0;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
