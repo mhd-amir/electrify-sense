@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { MaintenancePanel } from "@/components/assets/MaintenancePanel";
 import { StatusPill } from "@/components/ui-kit/StatusPill";
 import { useGrid } from "@/context/GridContext";
+import { useRole } from "@/context/RoleContext";
 import { amps, degc, kv, mw, nf, pct } from "@/utils/format";
 import { kindAccent, kindLabel } from "@/utils/status";
 
@@ -39,6 +40,7 @@ function Bar({ label, value }: { label: string; value: number }) {
 /** Detail drawer for any grid asset (node or line), driven by the live simulation state. */
 export function AssetDrawer() {
   const { state, selectedId, setSelectedId, fail, serviceNode } = useGrid();
+  const { can } = useRole();
   const node = state.nodes.find((n) => n.id === selectedId);
   const line = state.lines.find((l) => l.id === selectedId);
   const open = Boolean(node ?? line);
@@ -95,9 +97,9 @@ export function AssetDrawer() {
               </div>
               <div className="border-t border-border/50 pt-4">
                 <p className="mb-3 text-[10px] tracking-[0.16em] text-muted-foreground uppercase">Maintenance & condition</p>
-                <MaintenancePanel node={node} clock={state.clock} onService={() => serviceNode(node.id)} />
+                <MaintenancePanel node={node} clock={state.clock} {...(can("maintenance.service") ? { onService: () => serviceNode(node.id) } : {})} />
               </div>
-              {node.status !== "failed" ? (
+              {node.status !== "failed" && can("failure.inject") ? (
                 <button
                   onClick={() => fail(node.id)}
                   className="w-full rounded-xl border border-crit/50 bg-crit/10 py-2 text-xs font-semibold tracking-wider text-crit uppercase transition-colors hover:bg-crit/20"
@@ -128,7 +130,7 @@ export function AssetDrawer() {
                 <Row label="Length" value={`${nf(line.lengthKm)} km`} />
                 <Row label="Losses" value={mw(line.lossMw)} />
               </div>
-              {line.status !== "failed" ? (
+              {line.status !== "failed" && can("failure.inject") ? (
                 <button
                   onClick={() => fail(line.id)}
                   className="w-full rounded-xl border border-crit/50 bg-crit/10 py-2 text-xs font-semibold tracking-wider text-crit uppercase transition-colors hover:bg-crit/20"

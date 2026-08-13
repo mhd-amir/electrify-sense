@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { Activity, AlertTriangle, BatteryCharging, Cloud, Cpu, Factory, Gauge, Leaf, Percent, ShieldCheck, Waves, Wrench, Zap } from "lucide-react";
 
 import { HealthGauge } from "@/components/ui-kit/HealthGauge";
