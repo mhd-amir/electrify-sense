@@ -570,6 +570,9 @@ export function injectFailure(state: GridState, targetId: string): GridState {
       `Trip on ${line.name}`,
       `Protection operated at ${line.loadPct}% loading. ${line.flowMw.toFixed(0)} MW rerouting to adjacent corridors.`,
       line.id,
+      undefined,
+      audit("TRIP-MANUAL", "operator", "Corridor loading", state.thresholds.lineCritPct, line.loadPct, "%"),
+      state.clock,
     );
     return {
       ...state,
@@ -589,6 +592,9 @@ export function injectFailure(state: GridState, targetId: string): GridState {
     `${node.name} offline`,
     `Asset tripped from service. ${node.powerMw.toFixed(0)} MW lost from the ${node.region} grid.`,
     node.id,
+    undefined,
+    audit("TRIP-MANUAL", "operator", "Asset infeed", 0, Math.round(node.powerMw), "MW"),
+    state.clock,
   );
   return {
     ...state,
@@ -601,12 +607,105 @@ export function injectFailure(state: GridState, targetId: string): GridState {
   };
 }
 
-export function restoreAll(state: GridState): GridState {
+export function restoreAll(state: GridState, ids?: string[]): GridState {
+  const hit = (id: string) => !ids || ids.includes(id);
   return {
     ...state,
-    nodes: state.nodes.map((n) => (n.status === "failed" ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
-    lines: state.lines.map((l) => (l.status === "failed" ? { ...l, status: "normal" } : l)),
-    alerts: pushAlert(state.alerts, "info", "Assets restored to service", "All tripped assets have been re-energised and are synchronising."),
+    nodes: state.nodes.map((n) => (n.status === "failed" && hit(n.id) ? { ...n, status: "normal", health: clamp(n.health, 78, 100) } : n)),
+    lines: state.lines.map((l) => (l.status === "failed" && hit(l.id) ? { ...l, status: "normal" } : l)),
+    alerts: pushAlert(
+      state.alerts,
+      "info",
+      ids ? `Restored ${ids.length} selected asset${ids.length === 1 ? "" : "s"}` : "Assets restored to service",
+      "Tripped assets have been re-energised and are synchronising.",
+      undefined,
+      undefined,
+      audit("OPS-RESTORE", "operator"),
+      state.clock,
+    ),
+  };
+}
+
+/** Bulk failure injection across many assets in one operator action. */
+export function injectFailures(state: GridState, ids: string[]): GridState {
+  let next = state;
+  for (const id of ids) next = injectFailure(next, id);
+  return next;
+}
+
+/** Bulk service across many nodes. */
+export function serviceAssets(state: GridState, ids: string[]): GridState {
+  let next = state;
+  for (const id of ids) next = serviceAsset(next, id);
+  return next;
+}
+
+/** Bulk maintenance state change: schedule work now, defer, or flag for inspection. */
+export function setMaintenanceState(state: GridState, ids: string[], mode: "schedule" | "defer" | "inspect"): GridState {
+  const nodes = state.nodes.map((n) => {
+    if (!ids.includes(n.id)) return n;
+    const m = n.maintenance;
+    if (mode === "schedule") {
+      return { ...n, maintenance: { ...m, nextServiceTs: state.clock + 2 * DAY_MS, condition: "attention" as const } };
+    }
+    if (mode === "defer") {
+      return { ...n, maintenance: { ...m, nextServiceTs: m.nextServiceTs + 30 * DAY_MS } };
+    }
+    return {
+      ...n,
+      maintenance: {
+        ...m,
+        history: [
+          {
+            id: uid("svc"),
+            ts: state.clock,
+            kind: "inspection" as const,
+            summary: "Bulk inspection raised from the control room asset selection",
+            technician: "Field inspection crew",
+            downtimeH: 0.5,
+            costLakh: 1.2,
+          },
+          ...m.history,
+        ].slice(0, 12),
+      },
+    };
+  });
+  const label = mode === "schedule" ? "scheduled for service" : mode === "defer" ? "service deferred 30 days" : "inspection raised";
+  return {
+    ...state,
+    nodes,
+    alerts: pushAlert(
+      state.alerts,
+      "info",
+      `${ids.length} asset${ids.length === 1 ? "" : "s"} — ${label}`,
+      "Bulk maintenance state change applied from the control room.",
+      undefined,
+      undefined,
+      audit("OPS-MAINT-BULK", "operator"),
+      state.clock,
+    ),
+  };
+}
+
+/** Apply a simulation preset (scenario, demand bias and renewable bias in one action). */
+export function applyPreset(state: GridState, id: SimPreset): GridState {
+  const p = SIM_PRESETS.find((x) => x.id === id) ?? SIM_PRESETS[0]!;
+  return {
+    ...state,
+    preset: p.id,
+    scenario: p.scenario,
+    demandBias: p.demandBias,
+    renewableBias: p.renewableBias,
+    alerts: pushAlert(
+      state.alerts,
+      p.id === "baseline" ? "info" : "warning",
+      `Simulation preset: ${p.label}`,
+      p.detail,
+      undefined,
+      undefined,
+      audit("OPS-PRESET", "operator"),
+      state.clock,
+    ),
   };
 }
 
@@ -653,6 +752,9 @@ export function serviceAsset(state: GridState, id: string): GridState {
       `Service completed on ${node.name}`,
       `Maintenance clock reset; next window in ${node.maintenance.intervalDays} days.`,
       node.id,
+      undefined,
+      audit("OPS-SERVICE", "operator"),
+      state.clock,
     ),
   };
 }
@@ -680,10 +782,10 @@ export function applyRecommendation(state: GridState, rec: Recommendation): Grid
     ...state,
     nodes,
     recommendations: state.recommendations.map((r) => (r.id === rec.id ? { ...r, state: "accepted" } : r)),
-    alerts: pushAlert(state.alerts, "info", `Action executed: ${rec.title}`, `${rec.impact} (operator accepted, confidence ${rec.confidence}%).`),
+    alerts: pushAlert(state.alerts, "info", `Action executed: ${rec.title}`, `${rec.impact} (operator accepted, confidence ${rec.confidence}%).`, undefined, undefined, audit("AI-ACCEPT", "ai", "Confidence", 70, rec.confidence, "%"), state.clock),
   };
 }
 
 export function systemAlert(state: GridState, severity: Severity, title: string, detail: string): GridState {
-  return { ...state, alerts: pushAlert(state.alerts, severity, title, detail) };
+  return { ...state, alerts: pushAlert(state.alerts, severity, title, detail, undefined, undefined, audit("OPS-ACTION", "operator"), state.clock) };
 }
