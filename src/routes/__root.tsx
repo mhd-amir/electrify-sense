@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/layout/AppShell";
 import { GridProvider } from "@/context/GridContext";
+import { RoleProvider } from "@/context/RoleContext";
 
 function NotFoundComponent() {
   return (
@@ -130,12 +131,14 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GridProvider>
-        <AppShell>
-          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </AppShell>
-      </GridProvider>
+      <RoleProvider>
+        <GridProvider>
+          <AppShell>
+            {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+            <Outlet />
+          </AppShell>
+        </GridProvider>
+      </RoleProvider>
     </QueryClientProvider>
   );
 }
