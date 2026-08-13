@@ -180,10 +180,23 @@ function pushAlert(
   detail: string,
   assetId?: string,
   key?: string,
+  audit?: AlertAudit,
+  simTs?: number,
 ): GridAlert[] {
   if (key && alerts.some((a) => a.key === key && !a.resolved)) return alerts;
   if (alerts.some((a) => a.title === title && Date.now() - a.ts < 25000)) return alerts;
-  const alert: GridAlert = { id: uid("alert"), ts: Date.now(), severity, title, detail, assetId, acknowledged: false, key };
+  const alert: GridAlert = {
+    id: uid("alert"),
+    ts: Date.now(),
+    severity,
+    title,
+    detail,
+    assetId,
+    acknowledged: false,
+    key,
+    simTs,
+    audit: audit ?? { reasonCode: "SYS-INFO", source: "simulation" },
+  };
   return [alert, ...alerts].slice(0, 60);
 }
 
@@ -191,8 +204,19 @@ function pushAlert(
 function resolveAlert(alerts: GridAlert[], key: string, enabled: boolean): GridAlert[] {
   if (!enabled) return alerts;
   if (!alerts.some((a) => a.key === key && !a.resolved)) return alerts;
-  return alerts.map((a) => (a.key === key && !a.resolved ? { ...a, resolved: true, acknowledged: true } : a));
+  return alerts.map((a) =>
+    a.key === key && !a.resolved ? { ...a, resolved: true, acknowledged: true, resolvedTs: Date.now() } : a,
+  );
 }
+
+const audit = (
+  reasonCode: string,
+  source: AlertAudit["source"],
+  metric?: string,
+  thresholdValue?: number,
+  actualValue?: number,
+  unit?: string,
+): AlertAudit => ({ reasonCode, source, metric, thresholdValue, actualValue, unit });
 
 export function makeRecommendation(
   action: RecommendationAction,
