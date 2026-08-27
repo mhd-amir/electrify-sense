@@ -102,6 +102,17 @@ export interface GridLine {
 
 export type Severity = "info" | "warning" | "critical";
 
+/** Audit metadata captured at the moment an alert is raised. */
+export interface AlertAudit {
+  /** short machine-readable reason code, e.g. FREQ-CRIT */
+  reasonCode: string;
+  source: "threshold" | "operator" | "simulation" | "ai";
+  metric?: string | undefined;
+  thresholdValue?: number | undefined;
+  actualValue?: number | undefined;
+  unit?: string | undefined;
+}
+
 export interface GridAlert {
   id: string;
   ts: number;
@@ -113,6 +124,11 @@ export interface GridAlert {
   /** stable key used for de-duplication and auto-resolution */
   key?: string | undefined;
   resolved?: boolean | undefined;
+  /** simulated clock time at trigger (distinct from wall-clock ts) */
+  simTs?: number | undefined;
+  resolvedTs?: number | undefined;
+  ackTs?: number | undefined;
+  audit?: AlertAudit | undefined;
 }
 
 export type Priority = "low" | "medium" | "high" | "critical";
@@ -158,6 +174,10 @@ export interface Sample extends Metrics {
 
 export type Scenario = "normal" | "storm" | "heatwave";
 
+export type SimPreset = "baseline" | "high-demand" | "renewable-spike" | "brownout-risk";
+
+export type OperatorRole = "operator" | "supervisor" | "engineer";
+
 export interface Weather {
   summary: string;
   tempC: number;
@@ -177,6 +197,9 @@ export interface GridState {
   clock: number;
   scenario: Scenario;
   demandBias: number;
+  preset: SimPreset;
+  /** -1..1 multiplier bias applied to renewable output (presets) */
+  renewableBias: number;
   nodes: GridNode[];
   lines: GridLine[];
   metrics: Metrics;
