@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   CloudLightning,
   Flame,
+  Lock,
   Pause,
   Play,
   PlayCircle,
@@ -14,14 +15,21 @@ import {
 } from "lucide-react";
 
 import { DEMO_STAGES, useGrid } from "@/context/GridContext";
+import { useRole } from "@/context/RoleContext";
 import { cn } from "@/lib/utils";
+import { SIM_PRESETS } from "@/utils/engine";
 
 const speeds: (1 | 2 | 5 | 10)[] = [1, 2, 5, 10];
 
 export function SimControls() {
-  const { state, start, pause, reset, setSpeed, setScenario, nudgeDemand, fail, restore, startDemo, stopDemo } = useGrid();
+  const { state, start, pause, reset, setSpeed, setScenario, nudgeDemand, fail, restore, startDemo, stopDemo, setPreset } = useGrid();
+  const { can, readOnly, role } = useRole();
   const [failOpen, setFailOpen] = useState(false);
   const [failKind, setFailKind] = useState<"line" | "substation" | "plant">("line");
+  const canSim = can("sim.control");
+  const canPreset = can("sim.preset");
+  const canInject = can("failure.inject");
+  const canRestore = can("failure.restore");
 
   const options =
     failKind === "line"
@@ -57,17 +65,40 @@ export function SimControls() {
       </AnimatePresence>
 
       <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-        <Btn onClick={start} active={state.running} icon={Play} label="Start" />
-        <Btn onClick={pause} active={!state.running} icon={Pause} label="Pause" />
-        <Btn onClick={reset} icon={RotateCcw} label="Reset" />
+        {readOnly && (
+          <span className="flex items-center gap-1.5 rounded-xl border border-warn/50 bg-warn/10 px-3 py-2 text-[11px] font-semibold text-warn">
+            <Lock className="size-3.5" /> Read-only
+          </span>
+        )}
+        <Btn onClick={start} active={state.running} icon={Play} label="Start" disabled={!canSim} />
+        <Btn onClick={pause} active={!state.running} icon={Pause} label="Pause" disabled={!canSim} />
+        <Btn onClick={reset} icon={RotateCcw} label="Reset" disabled={!canSim} />
+
+        <div className="mx-1 hidden items-center gap-1 rounded-xl border border-border/60 bg-panel-2/60 p-1 lg:flex">
+          {SIM_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPreset(p.id)}
+              disabled={!canPreset}
+              title={canPreset ? p.detail : `The ${role.label} role cannot switch presets.`}
+              className={cn(
+                "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                state.preset === p.id ? "bg-info/20 text-info" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
 
         <div className="mx-1 flex items-center gap-1 rounded-xl border border-border/60 bg-panel-2/60 p-1">
           {speeds.map((s) => (
             <button
               key={s}
               onClick={() => setSpeed(s)}
+              disabled={!canSim}
               className={cn(
-                "tabular rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors",
+                "tabular rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                 state.speed === s ? "bg-info/20 text-info" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -82,6 +113,7 @@ export function SimControls() {
           icon={CloudLightning}
           label="Storm"
           tone="info"
+          disabled={!canPreset}
         />
         <Btn
           onClick={() => setScenario(state.scenario === "heatwave" ? "normal" : "heatwave")}
@@ -89,12 +121,13 @@ export function SimControls() {
           icon={Flame}
           label="Heatwave"
           tone="hot"
+          disabled={!canPreset}
         />
-        <Btn onClick={() => nudgeDemand(0.05)} icon={TrendingUp} label="Demand +" tone="warn" />
-        <Btn onClick={() => nudgeDemand(-0.05)} icon={TrendingDown} label="Demand −" tone="ok" />
+        <Btn onClick={() => nudgeDemand(0.05)} icon={TrendingUp} label="Demand +" tone="warn" disabled={!canPreset} />
+        <Btn onClick={() => nudgeDemand(-0.05)} icon={TrendingDown} label="Demand −" tone="ok" disabled={!canPreset} />
 
         <div className="relative">
-          <Btn onClick={() => setFailOpen((v) => !v)} active={failOpen} icon={Zap} label="Inject failure" tone="crit" />
+          <Btn onClick={() => setFailOpen((v) => !v)} active={failOpen} icon={Zap} label="Inject failure" tone="crit" disabled={!canInject} />
           <AnimatePresence>
             {failOpen && (
               <motion.div
@@ -141,7 +174,7 @@ export function SimControls() {
           </AnimatePresence>
         </div>
 
-        {anyFailed && <Btn onClick={restore} icon={ShieldCheck} label="Restore all" tone="ok" />}
+        {anyFailed && <Btn onClick={restore} icon={ShieldCheck} label="Restore all" tone="ok" disabled={!canRestore} />}
 
         <Btn
           onClick={state.demoRunning ? stopDemo : startDemo}
@@ -149,6 +182,7 @@ export function SimControls() {
           icon={PlayCircle}
           label={state.demoRunning ? "Demo running" : "Guided demo"}
           tone="info"
+          disabled={!canSim}
           className="ml-auto"
         />
       </div>
@@ -163,6 +197,7 @@ function Btn({
   active,
   tone = "info",
   className,
+  disabled,
 }: {
   onClick: () => void;
   icon: typeof Play;
@@ -170,6 +205,7 @@ function Btn({
   active?: boolean;
   tone?: "info" | "ok" | "warn" | "hot" | "crit";
   className?: string;
+  disabled?: boolean;
 }) {
   const toneCls = {
     info: "border-info/50 bg-info/15 text-info",
@@ -181,15 +217,16 @@ function Btn({
 
   return (
     <motion.button
-      whileTap={{ scale: 0.96 }}
+      whileTap={{ scale: disabled ? 1 : 0.96 }}
       onClick={onClick}
+      disabled={disabled}
       className={cn(
-        "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
+        "flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         active ? toneCls : "border-border/60 bg-panel-2/60 text-muted-foreground hover:text-foreground",
         className,
       )}
     >
-      <Icon className="size-3.5" />
+      {disabled ? <Lock className="size-3.5" /> : <Icon className="size-3.5" />}
       <span className="hidden sm:inline">{label}</span>
     </motion.button>
   );
